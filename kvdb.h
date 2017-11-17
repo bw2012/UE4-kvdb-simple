@@ -81,8 +81,10 @@ public:
 //============================================================================
 
 typedef struct TFileHeader {
-    uint32  version = 1;
+    uint32 version = 1;
     
+	uint32 keySize = 0;
+
     ulong64 timestamp = 0;
     
     uint32  endOfHeaderOffset = 0;
@@ -90,30 +92,22 @@ typedef struct TFileHeader {
 } TFileHeader;
 
 std::ostream& operator << (std::ostream& os, const TFileHeader& obj) {
-    write(os, obj.version);
-    write(os, obj.timestamp);
-    write(os, obj.endOfHeaderOffset);
+    write(os, obj);
     return os;
 }
 
 std::istream& operator >> (std::istream& is, TFileHeader& obj) {
-    read(is, obj.version);
-    read(is, obj.timestamp);
-    read(is, obj.endOfHeaderOffset);
+    read(is, obj);
     return is;
 }
 
 std::ostream* operator << (std::ostream* os, const TFileHeader& obj) {
-    write(os, obj.version);
-    write(os, obj.timestamp);
-    write(os, obj.endOfHeaderOffset);
+	write(os, obj);
     return os;
 }
 
 std::istream* operator >> (std::istream* is, TFileHeader& obj) {
-    read(is, obj.version);
-    read(is, obj.timestamp);
-    read(is, obj.endOfHeaderOffset);
+    read(is, obj);
     return is;
 }
 
@@ -136,26 +130,22 @@ typedef struct TTableHeader {
 typedef TPosWrapper<TTableHeader> TTableHeaderInfo;
 
 std::ostream& operator << (std::ostream& os, const TTableHeader& obj) {
-    write(os, obj.recordCount);
-    write(os, obj.nextTable);
+	write(os, obj);
     return os;
 }
 
 std::istream& operator >> (std::istream& is, TTableHeader& obj) {
-    read(is, obj.recordCount);
-    read(is, obj.nextTable);
+	read(is, obj);
     return is;
 }
 
 std::ostream* operator << (std::ostream* os, const TTableHeader& obj) {
-    write(os, obj.recordCount);
-    write(os, obj.nextTable);
+	write(os, obj);
     return os;
 }
 
 std::istream* operator >> (std::istream* is, TTableHeader& obj) {
-    read(is, obj.recordCount);
-    read(is, obj.nextTable);
+	read(is, obj);
     return is;
 }
 
@@ -188,34 +178,22 @@ struct TKeyInfoComparatorByInitialLength {
 };
 
 std::ostream& operator << (std::ostream& os, const TKeyEntry& obj) {
-    write(os, obj.dataPos);
-    write(os, obj.dataLength);
-    write(os, obj.initialDataLength);
-    write(os, obj.freeKeyData);
+	write(os, obj);
     return os;
 }
 
 std::istream& operator >> (std::istream& is, TKeyEntry& obj) {
-    read(is, obj.dataPos);
-    read(is, obj.dataLength);
-    read(is, obj.initialDataLength);
-    read(is, obj.freeKeyData);
+	read(is, obj);
     return is;
 }
 
 std::ostream* operator << (std::ostream* os, const TKeyEntry& obj) {
-    write(os, obj.dataPos);
-    write(os, obj.dataLength);
-    write(os, obj.initialDataLength);
-    write(os, obj.freeKeyData);
+	write(os, obj);
     return os;
 }
 
 std::istream* operator >> (std::istream* is, TKeyEntry& obj) {
-    read(is, obj.dataPos);
-    read(is, obj.dataLength);
-    read(is, obj.initialDataLength);
-    read(is, obj.freeKeyData);
+	read(is, obj);
     return is;
 }
 
