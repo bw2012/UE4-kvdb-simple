@@ -55,7 +55,6 @@ void read(std::istream* is, const T& obj) {
 //============================================================================
 // File position
 //============================================================================
-
 template <typename T>
 class TPosWrapper {
 
@@ -79,16 +78,11 @@ public:
 //============================================================================
 // File header
 //============================================================================
-
 typedef struct TFileHeader {
     uint32 version = 1;
-    
 	uint32 keySize = 0;
-
     ulong64 timestamp = 0;
-    
     uint32  endOfHeaderOffset = 0;
-    
 } TFileHeader;
 
 std::ostream& operator << (std::ostream& os, const TFileHeader& obj) {
@@ -114,17 +108,9 @@ std::istream* operator >> (std::istream* is, TFileHeader& obj) {
 //============================================================================
 // Table header
 //============================================================================
-
 typedef struct TTableHeader {
-
     ulong64 recordCount = 0;
-    
     ulong64 nextTable = 0;
-    
-    //TTableHeader() {};
-    
-    //TTableHeader(TTableHeader& t) : recordCount(t.recordCount), nextTable(t.nextTable) {};
-    
 } TTableHeader;
 
 typedef TPosWrapper<TTableHeader> TTableHeaderInfo;
@@ -152,7 +138,6 @@ std::istream* operator >> (std::istream* is, TTableHeader& obj) {
 //============================================================================
 // Key Entry
 //============================================================================
-
 typedef struct TKeyEntry {
     ulong64 dataPos = 0;
     ulong64 dataLength = 0;
@@ -198,9 +183,8 @@ std::istream* operator >> (std::istream* is, TKeyEntry& obj) {
 }
 
 //============================================================================
-// 
+// Key data hash
 //============================================================================
-
 namespace std {
     template <>
     struct hash<TKeyData> {
@@ -217,22 +201,16 @@ namespace std {
 //============================================================================
 // File db
 //============================================================================
-
 template <typename K, typename V>
 class KvFile {
     
 private:
-    
-    std::unordered_map<TKeyData, TKeyEntryInfo> dataMap;
-    
-    std::fstream* filePtr = nullptr;
-    
-    std::list<TKeyEntryInfo> reservedKeyList;
-    
-    std::set<TKeyEntryInfo, TKeyInfoComparatorByInitialLength> deletedKeyList;
-    
-    std::list<TTableHeaderInfo> tableList;
 
+    std::unordered_map<TKeyData, TKeyEntryInfo> dataMap;
+    std::fstream* filePtr = nullptr;
+    std::list<TKeyEntryInfo> reservedKeyList;
+    std::set<TKeyEntryInfo, TKeyInfoComparatorByInitialLength> deletedKeyList;
+	std::list<TTableHeaderInfo> tableList;
 	std::mutex fileMutex;
     
 private:
@@ -546,6 +524,7 @@ public:
     
         // save file header
         TFileHeader fileHeader;
+		fileHeader.keySize = KVDB_KEY_SIZE;
         fileHeader.endOfHeaderOffset = sizeof(fileHeader);
     
         outf << fileHeader;
