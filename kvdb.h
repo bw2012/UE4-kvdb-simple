@@ -308,11 +308,6 @@ private:
     void newPairFromReserved(const TKeyData& keyData, const TValueData& valueData){                
         // has reserved key slots
         TKeyEntryInfo& keyInfo = reservedKeyList.front();
-        reservedKeyList.pop_front();
-                
-        // rewrite value data
-		//filePtr->seekg(0, filePtr->end);
-		//int endFile = filePtr->tellg();
 
         filePtr->seekg(0, std::ios::end); // to end-of-file
         ulong64 endFile = (ulong64)(filePtr->tellp());
@@ -332,6 +327,7 @@ private:
                 
         // add new pair to table 
         dataMap.insert({keyInfo().freeKeyData, keyInfo});   
+		reservedKeyList.pop_front();
     }
     
     ulong64 readTable(){
