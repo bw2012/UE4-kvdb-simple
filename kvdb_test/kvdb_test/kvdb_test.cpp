@@ -60,11 +60,10 @@ typedef struct IntKey {
 
 
 void printPair(KvFile<int, int>& db, int key) {
-	TValueDataPtr dataPtr = db.get(intToBytes(key));
+	TValueDataPtr dataPtr = db.get(key);
 	if (dataPtr != nullptr) {
 		printf("key -> %d --- val -> %d\n", key, intFromVector(dataPtr));
-	}
-	else {
+	} else {
 		printf("key -> %d --- not found\n", key);
 	}
 }
@@ -77,10 +76,10 @@ int main() {
 
 	std::string file = "test.dat";
 
-	std::unordered_map<TKeyData, TValueData> test;
-	test.insert({ intToBytes(1), intToVector(1000) });
-	test.insert({ intToBytes(3), intToVector(2000) });
-	test.insert({ intToBytes(5), intToVector(3000) });
+	std::unordered_map<int, int> test;
+	test.insert({ 1, 1000 });
+	test.insert({ 3, 2000 });
+	test.insert({ 5, 3000 });
 
 	KvFile<int, int>::create(file, test);
 
@@ -90,11 +89,11 @@ int main() {
 
 	printPair(testDb, 5);
 
-	testDb.erase(intToBytes(5));
+	testDb.erase(5);
 
 	printPair(testDb, 5);
 
-	testDb.put(intToBytes(5), intToVector(777000));
+	testDb.put(5, 777000);
 
 	printPair(testDb, 5);
 

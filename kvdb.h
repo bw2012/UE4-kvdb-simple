@@ -11,6 +11,7 @@
 #include <list>
 #include <set>
 #include <mutex>
+#include <cassert>
 
 
 #define KVDB_KEY_SIZE 64
@@ -247,12 +248,8 @@ private:
 	std::mutex fileMutex;
     
 private:
-    
-	bool isKeySizeValid(K key) {
-		return sizeof(K) <= KVDB_KEY_SIZE;
-	}
 
-	TKeyData toKeyData(K key) {
+	static TKeyData toKeyData(K key) {
 		byte temp[KVDB_KEY_SIZE];
 		for (int i = 0; i < KVDB_KEY_SIZE; i++) {
 			temp[i] = 0;
@@ -268,11 +265,11 @@ private:
 		return arrayOfByte;
 	}
 
-	TValueData toValueData(V value) {
+	static TValueData toValueData(V value) {
 		std::vector<byte> temp;
 
-		if (temp.size() < sizeof(test)) temp.resize(sizeof(test));
-		std::memcpy(temp.data(), &test, sizeof(test));
+		if (temp.size() < sizeof(value)) temp.resize(sizeof(value));
+		std::memcpy(temp.data(), &value, sizeof(value));
 
 		return temp;
 	}
@@ -467,6 +464,10 @@ private:
             
 public:
     
+	KvFile() {
+		assert(sizeof(K) <= KVDB_KEY_SIZE);
+	}
+
 	void close() {
 		if (!filePtr->is_open()) {
 			return;
@@ -500,7 +501,9 @@ public:
 		fileMutex.unlock();
     }
     
-    TValueDataPtr get(const TKeyData& keyData){
+    TValueDataPtr get(const K& k){
+		TKeyData& keyData = toKeyData(k);
+
         if (!filePtr->is_open()) {
             return nullptr;
         }
@@ -529,7 +532,9 @@ public:
         return dataPtr;
     }
     
-    void erase(const TKeyData& keyData){
+    void erase(const K& k){
+		TKeyData& keyData = toKeyData(k);
+
         if (!filePtr->is_open()) {
             return;
         }
@@ -545,7 +550,10 @@ public:
     }
     
     
-    void put(const TKeyData& keyData, const TValueData& valueData){
+    void put(const K& k, const V& v){
+		TKeyData& keyData = toKeyData(k);
+		TValueData& valueData = toValueData(v);
+
         if (!filePtr->is_open()) {
             return;
         }
@@ -564,7 +572,7 @@ public:
 		fileMutex.unlock();
     }
     
-    static void create(std::string& file, const std::unordered_map<TKeyData, TValueData>& test) {
+    static void create(std::string& file, const std::unordered_map<K, V>& test) {
         std::ofstream outf(file, std::ios::out | std::ios::binary);
     
         if (!outf) {
@@ -590,10 +598,10 @@ public:
     
         for(auto& e : test) {
             TKeyEntry entry;
-            entry.freeKeyData = e.first;
+            entry.freeKeyData = toKeyData(e.first);
             entry.dataPos = dataBody.size() + bodyDataOffset;
             
-            TValueData valueData = e.second;
+            TValueData valueData = toValueData(e.second);
             entry.dataLength = valueData.size();
             entry.initialDataLength = valueData.size();
             
