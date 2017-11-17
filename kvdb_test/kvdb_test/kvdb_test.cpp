@@ -59,7 +59,7 @@ typedef struct IntKey {
 
 
 
-void printPair(KvFile& db, int key) {
+void printPair(KvFile<int, int>& db, int key) {
 	TValueDataPtr dataPtr = db.get(intToBytes(key));
 	if (dataPtr != nullptr) {
 		printf("key -> %d --- val -> %d\n", key, intFromVector(dataPtr));
@@ -82,9 +82,9 @@ int main() {
 	test.insert({ intToBytes(3), intToVector(2000) });
 	test.insert({ intToBytes(5), intToVector(3000) });
 
-	KvFile::create(file, test);
+	KvFile<int, int>::create(file, test);
 
-	KvFile testDb;
+	KvFile<int, int> testDb;
 	testDb.open(file);
 
 

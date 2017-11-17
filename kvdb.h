@@ -229,6 +229,7 @@ namespace std {
 // File db
 //============================================================================
 
+template <typename K, typename V>
 class KvFile {
     
 private:
@@ -247,6 +248,35 @@ private:
     
 private:
     
+	bool isKeySizeValid(K key) {
+		return sizeof(K) <= KVDB_KEY_SIZE;
+	}
+
+	TKeyData toKeyData(K key) {
+		byte temp[KVDB_KEY_SIZE];
+		for (int i = 0; i < KVDB_KEY_SIZE; i++) {
+			temp[i] = 0;
+		}
+
+		memcpy(&temp, &key, sizeof(K));
+
+		TKeyData arrayOfByte;
+		for (int i = 0; i < KVDB_KEY_SIZE; i++) {
+			arrayOfByte[i] = temp[i];
+		}
+
+		return arrayOfByte;
+	}
+
+	TValueData toValueData(V value) {
+		std::vector<byte> temp;
+
+		if (temp.size() < sizeof(test)) temp.resize(sizeof(test));
+		std::memcpy(temp.data(), &test, sizeof(test));
+
+		return temp;
+	}
+
     void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData){                
         // rewrite value data
         filePtr->seekg(keyInfo.key.dataPos);
