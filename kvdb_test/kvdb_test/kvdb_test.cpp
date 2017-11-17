@@ -7,57 +7,12 @@
 
 //-----------------------------------------------------------------------------
 
-TKeyData intToBytes(const int paramInt) {
-	byte temp[KVDB_KEY_SIZE];
-	for (int i = 0; i < KVDB_KEY_SIZE; i++) {
-		temp[i] = 0;
-	}
-
-	memcpy(&temp, &paramInt, sizeof(int));
-
-	TKeyData arrayOfByte;
-	for (int i = 0; i < KVDB_KEY_SIZE; i++) {
-		arrayOfByte[i] = temp[i];
-	}
-
-	return arrayOfByte;
-}
-
-int intFromBytes(const TKeyData& arrayOfByte) {
-	int temp = 0;
-	memcpy(&temp, &arrayOfByte, sizeof(int));
-
-	return temp;
-}
-
-std::vector<byte> intToVector(int test) {
-	std::vector<byte> temp;
-
-	if (temp.size() < sizeof(test)) temp.resize(sizeof(test));
-	std::memcpy(temp.data(), &test, sizeof(test));
-
-	return temp;
-}
-
 int intFromVector(TValueDataPtr dataPtr) {
 	int temp = 0;
 	memcpy(&temp, dataPtr->data(), sizeof(int));
 
 	return temp;
 }
-
-typedef struct IntKey {
-	int key;
-
-	IntKey(int k) : key(k) {};
-
-	TKeyData operator()() const {
-		return intToBytes(key);
-	};
-
-} IntKey;
-
-
 
 void printPair(KvFile<int, int>& db, int key) {
 	TValueDataPtr dataPtr = db.get(key);
