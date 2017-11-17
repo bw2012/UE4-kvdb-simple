@@ -10,6 +10,7 @@
 #include <string>
 #include <list>
 #include <set>
+#include <mutex>
 
 
 #define KVDB_KEY_SIZE 64
@@ -241,6 +242,8 @@ private:
     std::set<TKeyEntryInfo, TKeyInfoComparatorByInitialLength> deletedKeyList;
     
     std::list<TTableHeaderInfo> tableList;
+
+	std::mutex fileMutex;
     
 private:
     
@@ -453,6 +456,8 @@ public:
             return;
         }
  
+		fileMutex.lock();
+
         TFileHeader fileHeader;
         filePtr >> fileHeader;
                 
@@ -461,16 +466,20 @@ public:
             filePtr->seekg(nextTablePos);
             nextTablePos = readTable();
         }
+
+		fileMutex.unlock();
     }
     
     TValueDataPtr get(const TKeyData& keyData){
         if (!filePtr->is_open()) {
             return nullptr;
         }
-        
-        std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
 
-        if(got == dataMap.end()) {   
+		fileMutex.lock();
+
+        std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
+        if(got == dataMap.end()) {
+			fileMutex.unlock();
             return nullptr;
         }
 
@@ -486,6 +495,7 @@ public:
             dataPtr->push_back(tmp);
         }
     
+		fileMutex.unlock();
         return dataPtr;
     }
     
@@ -494,12 +504,14 @@ public:
             return;
         }
         
+		fileMutex.lock();
         std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
-
         if(got != dataMap.end()) {
             TKeyEntryInfo keyInfo = dataMap[keyData];
             earsePair(keyInfo);
         }
+
+		fileMutex.unlock();
     }
     
     
@@ -508,8 +520,9 @@ public:
             return;
         }
         
-        std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
+		fileMutex.lock();
 
+        std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
         if(got == dataMap.end()) {
             // pair not found  
             addNew(keyData, valueData);
@@ -517,6 +530,8 @@ public:
             // pair found  
             change(keyData, valueData);
         }
+
+		fileMutex.unlock();
     }
     
     static void create(std::string& file, const std::unordered_map<TKeyData, TValueData>& test) {
