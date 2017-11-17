@@ -42,21 +42,20 @@ int main() {
 	testDb.open(file);
 
 
-	//printPair(testDb, 5);
+	printPair(testDb, 5);
 
-	//testDb.erase(5);
-
-	//printPair(testDb, 5);
-
-	//testDb.put(5, 777000);
-
-	//printPair(testDb, 5);
-
-
-
+	testDb.erase(5);
 	
-	//testDb.put(3, 999);
-	//printPair(testDb, 3);
+	printPair(testDb, 5);
+
+	testDb.put(5, 777000);
+
+	printPair(testDb, 5);
+
+
+
+	testDb.put(3, 999);
+	printPair(testDb, 3);
 
 	testDb.put(111, 999);
 	printPair(testDb, 111);
