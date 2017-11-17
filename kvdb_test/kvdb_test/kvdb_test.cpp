@@ -42,31 +42,33 @@ int main() {
 	testDb.open(file);
 
 
-	printPair(testDb, 5);
+	//printPair(testDb, 5);
 
-	testDb.erase(5);
+	//testDb.erase(5);
 
-	printPair(testDb, 5);
+	//printPair(testDb, 5);
 
-	testDb.put(5, 777000);
+	//testDb.put(5, 777000);
 
-	printPair(testDb, 5);
+	//printPair(testDb, 5);
 
-	/*
-	testDb.put(intToBytes(3), intToVector(999));
-	printPair(testDb, 3);
 
-	testDb.put(intToBytes(111), intToVector(999));
+
+	
+	//testDb.put(3, 999);
+	//printPair(testDb, 3);
+
+	testDb.put(111, 999);
 	printPair(testDb, 111);
 
-	testDb.put(intToBytes(222), intToVector(999));
+	testDb.put(222, 999);
 	printPair(testDb, 222);
 
-	testDb.put(intToBytes(333), intToVector(999));
+	testDb.put(333, 999);
 	printPair(testDb, 333);
-	*/
+	
 
-	//testDb.close();
+	testDb.close();
 
     return 0;
 

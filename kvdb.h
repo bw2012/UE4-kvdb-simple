@@ -65,9 +65,15 @@ private:
 public:
 	ulong64 pos;
 
+	TPosWrapper() {};
+
 	TPosWrapper(T t, ulong64 p) : objT(t), pos(p) {};
 
+	const T& operator()() const { return objT; }
+
 	T& operator()() { return objT; }
+
+	T* operator->() { return &objT; }
 };
 
 //============================================================================
@@ -172,17 +178,12 @@ typedef struct TKeyEntry {
         
 } TKeyEntry;
 
-typedef struct TKeyEntryInfo {
-    TKeyEntry key;
-    
-    long entryPos = 0;
-    
-} TKeyEntryInfo;
+typedef TPosWrapper<TKeyEntry> TKeyEntryInfo;
 
 
 struct TKeyInfoComparatorByInitialLength {
     bool operator() (const TKeyEntryInfo &lhs, const TKeyEntryInfo &rhs) const {
-         return (lhs.key.initialDataLength > rhs.key.initialDataLength);
+        return (lhs().initialDataLength > rhs().initialDataLength);
     }
 };
 
@@ -285,23 +286,23 @@ private:
 
     void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData){                
         // rewrite value data
-        filePtr->seekg(keyInfo.key.dataPos);
+        filePtr->seekg(keyInfo().dataPos);
         filePtr->write((char*)valueData.data(), valueData.size());
                 
         // rewrite key data
-        keyInfo.key.dataLength = valueData.size(); // new length
-        filePtr->seekg(keyInfo.entryPos);
-        filePtr << keyInfo.key;
+        keyInfo().dataLength = valueData.size(); // new length
+        filePtr->seekg(keyInfo.pos);
+        filePtr << keyInfo();
     }
     
     void earsePair(TKeyEntryInfo& keyInfo){                                
         // rewrite key data
-        keyInfo.key.dataLength = 0; // new length
-        filePtr->seekg(keyInfo.entryPos);
-        filePtr << keyInfo.key;
+        keyInfo().dataLength = 0; // new length
+        filePtr->seekg(keyInfo.pos);
+        filePtr << keyInfo();
         
         deletedKeyList.insert(keyInfo);
-        dataMap.erase(keyInfo.key.freeKeyData);
+        dataMap.erase(keyInfo().freeKeyData);
     }
     
     void newPairFromReserved(const TKeyData& keyData, const TValueData& valueData){                
@@ -310,21 +311,27 @@ private:
         reservedKeyList.pop_front();
                 
         // rewrite value data
+		//filePtr->seekg(0, filePtr->end);
+		//int endFile = filePtr->tellg();
+
         filePtr->seekg(0, std::ios::end); // to end-of-file
-        int endFile =  (int)(filePtr->tellp());
+        ulong64 endFile = (ulong64)(filePtr->tellp());
+
+		printf("size1 -> %d\n", (ulong64)(filePtr->tellp()));
         filePtr->write((char*)valueData.data(), valueData.size());
+		printf("size2 -> %d\n", (ulong64)(filePtr->tellp()));
                 
         // fill key data
-        keyInfo.key.dataLength = valueData.size(); // length
-        keyInfo.key.initialDataLength = valueData.size(); // length
-        keyInfo.key.dataPos = endFile;
-        keyInfo.key.freeKeyData = keyData;
+        keyInfo().dataLength = valueData.size(); // length
+        keyInfo().initialDataLength = valueData.size(); // length
+        keyInfo().dataPos = endFile;
+        keyInfo().freeKeyData = keyData;
                 
-        filePtr->seekg(keyInfo.entryPos);
-        filePtr << keyInfo.key;
+        filePtr->seekg(keyInfo.pos);
+        filePtr << keyInfo();
                 
         // add new pair to table 
-        dataMap.insert({keyInfo.key.freeKeyData, keyInfo});   
+        dataMap.insert({keyInfo().freeKeyData, keyInfo});   
     }
     
     ulong64 readTable(){
@@ -341,29 +348,25 @@ private:
             TKeyEntry keyEntry;
             filePtr >> keyEntry;
             
-            TKeyEntryInfo keyInfo;
-            keyInfo.key = keyEntry;
-            keyInfo.entryPos = pos;
+			TKeyEntryInfo keyInfo(keyEntry, pos);
             
-            if(keyInfo.key.dataLength > 0){
-                printf("key -> %d\n", keyInfo.entryPos);
+            if(keyInfo().dataLength > 0){
+                printf("key -> %d\n", keyInfo.pos);
                 dataMap.insert({keyEntry.freeKeyData, keyInfo});                
             } else {
-                if(keyInfo.key.initialDataLength == 0 ){
+                if(keyInfo().initialDataLength == 0 ){
                     // reserved key slot
-                    printf("reserved key slot -> %d\n", keyInfo.entryPos);
+                    printf("reserved key slot -> %d\n", keyInfo.pos);
                     reservedKeyList.push_back(keyInfo);
                 } else {
                     // marked as deleted pair
-                    printf("deleted key -> %d\n", keyInfo.entryPos);
+                    printf("deleted key -> %d\n", keyInfo.pos);
                     deletedKeyList.insert(keyInfo);
                 }
             }
         }
-        
-        
-        TTableHeaderInfo tableInfo(tableHeader, tablePos);        
-        tableList.push_back(tableInfo);
+               
+        tableList.push_back(TTableHeaderInfo(tableHeader, tablePos));
         
         printf("next table -> %d\n", tableHeader.nextTable);
         
@@ -387,10 +390,7 @@ private:
             TKeyEntry newReservedKey;
             filePtr << newReservedKey;
             
-            TKeyEntryInfo keyInfo;
-            keyInfo.key = newReservedKey;
-            keyInfo.entryPos = newReservedKeyPos;
-            
+            TKeyEntryInfo keyInfo(newReservedKey, newReservedKeyPos);
             reservedKeyList.push_back(keyInfo);
         }
         
@@ -405,8 +405,7 @@ private:
         filePtr << lastTable();
         
         // add new table to internal list
-        TTableHeaderInfo newTableInfo(newTable, newTablePos);
-        tableList.push_back(newTableInfo);
+        tableList.push_back(TTableHeaderInfo(newTable, newTablePos));
     }
     
     bool hasReserved(){
@@ -415,10 +414,11 @@ private:
     
     bool tryWriteToSuitableDeletedPair(const TKeyData& keyData, const TValueData& valueData){
         for (auto itr = deletedKeyList.begin(); itr != deletedKeyList.end();) {
-            if (itr->key.initialDataLength >= valueData.size()){
+			TKeyEntryInfo keyInfo = *itr;
+            if (keyInfo().initialDataLength >= valueData.size()){
                 TKeyEntryInfo keyInfo = *itr;
                 rewritePair(keyInfo, valueData);
-                dataMap.insert({keyInfo.key.freeKeyData, keyInfo});
+                dataMap.insert({keyInfo().freeKeyData, keyInfo});
                 itr = deletedKeyList.erase(itr); 
                 
                 return true;
@@ -450,7 +450,7 @@ private:
     void change(const TKeyData& keyData, const TValueData& valueData){
         TKeyEntryInfo keyInfo = dataMap[keyData];
         if(valueData.size() > 0){
-            if(keyInfo.key.dataLength >= valueData.size()){
+            if(keyInfo().dataLength >= valueData.size()){
                 printf("rewrite\n");
                 rewritePair(keyInfo, valueData);
             } else {
@@ -520,9 +520,11 @@ public:
             return nullptr;
         }
 
-        TKeyEntryInfo i = dataMap[keyData];
-        TKeyEntry e = i.key;
+        TKeyEntryInfo& i = dataMap[keyData];
+        const TKeyEntry& e = i();
         
+		printf("dataPos -> %d\n", e.dataPos);
+
         filePtr->seekg(e.dataPos);
         
         TValueDataPtr dataPtr = TValueDataPtr(new TValueData);
