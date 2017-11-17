@@ -15,9 +15,9 @@ int intFromVector(TValueDataPtr dataPtr) {
 }
 
 void printPair(KvFile<int, int>& db, int key) {
-	TValueDataPtr dataPtr = db.get(key);
+	std::shared_ptr<int> dataPtr = db.getVal(key);
 	if (dataPtr != nullptr) {
-		printf("key -> %d --- val -> %d\n", key, intFromVector(dataPtr));
+		printf("key -> %d --- val -> %d\n", key, *dataPtr.get());
 	} else {
 		printf("key -> %d --- not found\n", key);
 	}

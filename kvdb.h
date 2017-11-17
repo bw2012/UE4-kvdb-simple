@@ -213,6 +213,15 @@ private:
     
 private:
 
+	std::shared_ptr<V> valueFromData(TValueDataPtr dataPtr) {
+		if (dataPtr == nullptr) return nullptr;
+
+		V* temp = new V();
+		memcpy(temp, dataPtr->data(), dataPtr->size());
+
+		return std::shared_ptr<V>(temp);
+	}
+
 	static TKeyData toKeyData(K key) {
 		byte temp[KVDB_KEY_SIZE];
 		for (int i = 0; i < KVDB_KEY_SIZE; i++) temp[i] = 0;
@@ -460,6 +469,10 @@ public:
 		fileMutex.unlock();
         return dataPtr;
     }
+
+	std::shared_ptr<V> getVal(const K& k){
+		return valueFromData(get(k));
+	}
     
     void erase(const K& k){
 		TKeyData& keyData = toKeyData(k);
