@@ -434,6 +434,18 @@ private:
             
 public:
     
+	void close() {
+		if (!filePtr->is_open()) {
+			return;
+		}
+
+		filePtr->close();
+		dataMap.clear();
+		reservedKeyList.clear();
+		deletedKeyList.clear();
+		tableList.clear();
+	}
+
     void open(std::string& file){
         filePtr = new std::fstream(file, std::ios::in | std::ios::out | std::ios::binary);
         
