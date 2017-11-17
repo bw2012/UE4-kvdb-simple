@@ -146,11 +146,9 @@ typedef struct TKeyEntry {
     TKeyData freeKeyData;
     
     TKeyEntry(){
-        for(int i = 0; i < KVDB_KEY_SIZE; i++){
-            freeKeyData[i] = 0;
-        }
+        for(int i = 0; i < KVDB_KEY_SIZE; i++) freeKeyData[i] = 0;
     }
-        
+
 } TKeyEntry;
 
 typedef TPosWrapper<TKeyEntry> TKeyEntryInfo;
@@ -217,16 +215,12 @@ private:
 
 	static TKeyData toKeyData(K key) {
 		byte temp[KVDB_KEY_SIZE];
-		for (int i = 0; i < KVDB_KEY_SIZE; i++) {
-			temp[i] = 0;
-		}
+		for (int i = 0; i < KVDB_KEY_SIZE; i++) temp[i] = 0;
 
 		memcpy(&temp, &key, sizeof(K));
 
 		TKeyData arrayOfByte;
-		for (int i = 0; i < KVDB_KEY_SIZE; i++) {
-			arrayOfByte[i] = temp[i];
-		}
+		for (int i = 0; i < KVDB_KEY_SIZE; i++) arrayOfByte[i] = temp[i];
 
 		return arrayOfByte;
 	}
@@ -290,7 +284,7 @@ private:
         filePtr >> tableHeader;
     
         for(int i = 0; i < tableHeader.recordCount; i++){
-            int pos = filePtr->tellp();
+            ulong64 pos = (ulong64)filePtr->tellp();
             
             TKeyEntry keyEntry;
             filePtr >> keyEntry;
@@ -350,7 +344,7 @@ private:
     }
     
     bool hasReserved(){
-        return reservedKeyList.size();
+        return reservedKeyList.size() > 0;
     }
     
     bool tryWriteToSuitableDeletedPair(const TKeyData& keyData, const TValueData& valueData){
@@ -409,9 +403,7 @@ public:
 	}
 
 	void close() {
-		if (!filePtr->is_open()) {
-			return;
-		}
+		if (!filePtr->is_open()) return;
 
 		filePtr->close();
 		dataMap.clear();
@@ -420,12 +412,10 @@ public:
 		tableList.clear();
 	}
 
-    void open(std::string& file){
+    bool open(std::string& file){
         filePtr = new std::fstream(file, std::ios::in | std::ios::out | std::ios::binary);
         
-        if (!filePtr->is_open()) {
-            return;
-        }
+        if (!filePtr->is_open()) return false;
  
 		fileMutex.lock();
 
@@ -439,14 +429,13 @@ public:
         }
 
 		fileMutex.unlock();
+		return true;
     }
     
     TValueDataPtr get(const K& k){
 		TKeyData& keyData = toKeyData(k);
 
-        if (!filePtr->is_open()) {
-            return nullptr;
-        }
+        if (!filePtr->is_open()) return nullptr;
 
 		fileMutex.lock();
 
@@ -475,9 +464,7 @@ public:
     void erase(const K& k){
 		TKeyData& keyData = toKeyData(k);
 
-        if (!filePtr->is_open()) {
-            return;
-        }
+        if (!filePtr->is_open()) return;
         
 		fileMutex.lock();
         std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
@@ -494,9 +481,7 @@ public:
 		TKeyData& keyData = toKeyData(k);
 		TValueData& valueData = toValueData(v);
 
-        if (!filePtr->is_open()) {
-            return;
-        }
+        if (!filePtr->is_open()) return;
         
 		fileMutex.lock();
 
@@ -512,12 +497,10 @@ public:
 		fileMutex.unlock();
     }
     
-    static void create(std::string& file, const std::unordered_map<K, V>& test) {
+    static bool create(std::string& file, const std::unordered_map<K, V>& test) {
         std::ofstream outf(file, std::ios::out | std::ios::binary);
     
-        if (!outf) {
-            return;
-        }
+        if (!outf) return false;
     
         static const int max_key_records = KVDB_RESERVED_TABLE_SIZE;
         const int keyRecords = (test.size() > max_key_records) ? test.size() : max_key_records;
@@ -562,6 +545,8 @@ public:
                 
         outf.write((char*)dataBody.data(), dataBody.size());
         outf.close();
+
+		return true;
     }
 };
 
