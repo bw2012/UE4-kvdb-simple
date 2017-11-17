@@ -59,15 +59,15 @@ void read(std::istream* is, const T& obj) {
 template <typename T>
 class TPosWrapper {
 
-	T* objT;
+private:
+	T objT;
 
+public:
 	ulong64 pos;
 
 	TPosWrapper(T t, ulong64 p) : objT(t), pos(p) {};
 
-public:
 	T& operator()() { return objT; }
-
 };
 
 //============================================================================
@@ -127,16 +127,7 @@ typedef struct TTableHeader {
     
 } TTableHeader;
 
-typedef struct TTableHeaderInfo {
-    TTableHeader table;
-    
-    //TTableHeaderInfo() {};
-    
-    //TTableHeaderInfo(TTableHeader t) : table(t) {};
-    
-    long entryPos = 0;
-    
-} TTableHeaderInfo;
+typedef TPosWrapper<TTableHeader> TTableHeaderInfo;
 
 std::ostream& operator << (std::ostream& os, const TTableHeader& obj) {
     write(os, obj.recordCount);
@@ -371,10 +362,7 @@ private:
         }
         
         
-        TTableHeaderInfo tableInfo;
-        tableInfo.table = tableHeader;
-        tableInfo.entryPos = tablePos;
-        
+        TTableHeaderInfo tableInfo(tableHeader, tablePos);        
         tableList.push_back(tableInfo);
         
         printf("next table -> %d\n", tableHeader.nextTable);
@@ -408,18 +396,16 @@ private:
         
         // read previous last table 
         TTableHeaderInfo& lastTable = tableList.back();        
-        filePtr->seekg(lastTable.entryPos);
+        filePtr->seekg(lastTable.pos);
         
         // add link to new table
-        lastTable.table.nextTable = newTablePos;
+        lastTable().nextTable = newTablePos;
 
         // rewrite previous last table
-        filePtr << lastTable.table;
+        filePtr << lastTable();
         
         // add new table to internal list
-        TTableHeaderInfo newTableInfo;
-        newTableInfo.table = newTable;
-        newTableInfo.entryPos = newTablePos;
+        TTableHeaderInfo newTableInfo(newTable, newTablePos);
         tableList.push_back(newTableInfo);
     }
     
