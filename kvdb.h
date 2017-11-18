@@ -29,16 +29,6 @@ typedef std::shared_ptr<TValueData> TValueDataPtr;
 // Base IO
 //============================================================================
 template <typename T>
-void write(std::ostream& os, const T& obj) {
-    os.write((char*)&obj, sizeof(obj));
-}
-
-template <typename T>
-void read(std::istream& is, const T& obj) {
-    is.read((char*)&obj, sizeof(obj));
-}
-
-template <typename T>
 void write(std::ostream* os, const T& obj) {
     if(os != nullptr) {
         os->write((char*)&obj, sizeof(obj));
@@ -85,16 +75,6 @@ typedef struct TFileHeader {
     uint32  endOfHeaderOffset = 0;
 } TFileHeader;
 
-std::ostream& operator << (std::ostream& os, const TFileHeader& obj) {
-    write(os, obj);
-    return os;
-}
-
-std::istream& operator >> (std::istream& is, TFileHeader& obj) {
-    read(is, obj);
-    return is;
-}
-
 std::ostream* operator << (std::ostream* os, const TFileHeader& obj) {
 	write(os, obj);
     return os;
@@ -114,16 +94,6 @@ typedef struct TTableHeader {
 } TTableHeader;
 
 typedef TPosWrapper<TTableHeader> TTableHeaderInfo;
-
-std::ostream& operator << (std::ostream& os, const TTableHeader& obj) {
-	write(os, obj);
-    return os;
-}
-
-std::istream& operator >> (std::istream& is, TTableHeader& obj) {
-	read(is, obj);
-    return is;
-}
 
 std::ostream* operator << (std::ostream* os, const TTableHeader& obj) {
 	write(os, obj);
@@ -153,22 +123,11 @@ typedef struct TKeyEntry {
 
 typedef TPosWrapper<TKeyEntry> TKeyEntryInfo;
 
-
 struct TKeyInfoComparatorByInitialLength {
     bool operator() (const TKeyEntryInfo &lhs, const TKeyEntryInfo &rhs) const {
         return (lhs().initialDataLength > rhs().initialDataLength);
     }
 };
-
-std::ostream& operator << (std::ostream& os, const TKeyEntry& obj) {
-	write(os, obj);
-    return os;
-}
-
-std::istream& operator >> (std::istream& is, TKeyEntry& obj) {
-	read(is, obj);
-    return is;
-}
 
 std::ostream* operator << (std::ostream* os, const TKeyEntry& obj) {
 	write(os, obj);
@@ -511,9 +470,11 @@ public:
     }
     
     static bool create(std::string& file, const std::unordered_map<K, V>& test) {
-        std::ofstream outf(file, std::ios::out | std::ios::binary);
+        std::ofstream outFile(file, std::ios::out | std::ios::binary);
     
-        if (!outf) return false;
+        if (!outFile) return false;
+
+		std::ofstream* outFilePtr = &outFile;
     
         static const int max_key_records = KVDB_RESERVED_TABLE_SIZE;
         const int keyRecords = (test.size() > max_key_records) ? test.size() : max_key_records;
@@ -523,13 +484,13 @@ public:
 		fileHeader.keySize = KVDB_KEY_SIZE;
         fileHeader.endOfHeaderOffset = sizeof(fileHeader);
     
-        outf << fileHeader;
+		outFilePtr << fileHeader;
     
         TTableHeader tableHeader;
         tableHeader.recordCount = keyRecords;
-        outf << tableHeader;
+		outFilePtr << tableHeader;
     
-        int bodyDataOffset = (int)(outf.tellp()) + sizeof(TKeyEntry) * keyRecords;
+        int bodyDataOffset = (int)(outFile.tellp()) + sizeof(TKeyEntry) * keyRecords;
     
         std::vector<byte> dataBody;
     
@@ -544,7 +505,7 @@ public:
             
             dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
         
-            outf << entry;
+			outFilePtr << entry;
         }
     
         if(test.size() < max_key_records){
@@ -552,12 +513,12 @@ public:
             const int emptyRecords = max_key_records - test.size();
             for(int i = 0; i < emptyRecords; i++){
                 TKeyEntry entry;
-                outf << entry;
+				outFilePtr << entry;
             }
         }
                 
-        outf.write((char*)dataBody.data(), dataBody.size());
-        outf.close();
+		outFilePtr->write((char*)dataBody.data(), dataBody.size());
+		outFile.close();
 
 		return true;
     }
