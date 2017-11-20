@@ -12,6 +12,7 @@
 #include <set>
 #include <mutex>
 #include <cassert>
+#include <cstring> 
 
 
 #define KVDB_KEY_SIZE 64
