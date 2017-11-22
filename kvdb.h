@@ -14,6 +14,7 @@
 #include <list>
 #include <set>
 #include <mutex>
+#include <shared_mutex>
 #include <cassert>
 #include <cstring> 
 
@@ -174,7 +175,7 @@ namespace kvdb {
 		std::list<TKeyEntryInfo> reservedKeyList;
 		std::set<TKeyEntryInfo, TKeyInfoComparatorByInitialLength> deletedKeyList;
 		std::list<TTableHeaderInfo> tableList;
-		std::mutex fileMutex;
+		mutable std::shared_mutex fileSharedMutex;
 
 	private:
 
@@ -397,8 +398,6 @@ namespace kvdb {
 
 			if (!filePtr->is_open()) return false;
 
-			fileMutex.lock();
-
 			TFileHeader fileHeader;
 			filePtr >> fileHeader;
 
@@ -407,8 +406,7 @@ namespace kvdb {
 				filePtr->seekg(nextTablePos);
 				nextTablePos = readTable();
 			}
-
-			fileMutex.unlock();
+            
 			return true;
 		}
 
@@ -424,12 +422,10 @@ namespace kvdb {
 			TKeyData keyData = toKeyData(k);
 
 			if (!filePtr->is_open()) return nullptr;
-
-			fileMutex.lock();
+            std::shared_lock<std::shared_mutex> lock(fileSharedMutex);
 
 			std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
 			if (got == dataMap.end()) {
-				fileMutex.unlock();
 				return nullptr;
 			}
 
@@ -445,7 +441,6 @@ namespace kvdb {
 				dataPtr->push_back(tmp);
 			}
 
-			fileMutex.unlock();
 			return dataPtr;
 		}
 
@@ -457,15 +452,13 @@ namespace kvdb {
 			TKeyData keyData = toKeyData(k);
 
 			if (!filePtr->is_open()) return;
+            std::unique_lock<std::shared_mutex> lock(fileSharedMutex);
 
-			fileMutex.lock();
 			std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
 			if (got != dataMap.end()) {
 				TKeyEntryInfo keyInfo = dataMap[keyData];
 				earsePair(keyInfo);
 			}
-
-			fileMutex.unlock();
 		}
 
 
@@ -481,8 +474,7 @@ namespace kvdb {
 			}
 
 			if (!filePtr->is_open()) return;
-
-			fileMutex.lock();
+            std::unique_lock<std::shared_mutex> lock(fileSharedMutex);
 
 			std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
 			if (got == dataMap.end()) {
@@ -493,8 +485,6 @@ namespace kvdb {
 				// pair found  
 				change(keyData, valueData);
 			}
-
-			fileMutex.unlock();
 		}
 
 		static bool create(std::string& file, const std::unordered_map<K, V>& test) {
