@@ -412,6 +412,14 @@ namespace kvdb {
 			return true;
 		}
 
+		int size() {
+			if (!filePtr->is_open()) {
+				return 0;
+			} else {
+				return dataMap.size();
+			}
+		}
+
 		TValueDataPtr get(const K& k) {
 			TKeyData keyData = toKeyData(k);
 
@@ -463,7 +471,14 @@ namespace kvdb {
 
 		void put(const K& k, const V& v) {
 			TKeyData keyData = toKeyData(k);
-			TValueData valueData = toValueData(v);
+			TValueData valueData;
+
+			// TODO fixme
+			if (typeid(v) == typeid(TValueData)) {
+				valueData = (TValueData)v;
+			} else {
+				valueData = toValueData(v);
+			}
 
 			if (!filePtr->is_open()) return;
 
@@ -512,11 +527,18 @@ namespace kvdb {
 				entry.freeKeyData = toKeyData(e.first);
 				entry.dataPos = dataBody.size() + bodyDataOffset;
 
-				TValueData valueData = toValueData(e.second);
-				entry.dataLength = valueData.size();
-				entry.initialDataLength = valueData.size();
-
-				dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+				// TODO fixme
+				if (typeid(e.second) == typeid(TValueData)) {
+					const TValueData& valueData = e.second;
+					entry.dataLength = valueData.size();
+					entry.initialDataLength = valueData.size();
+					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+				} else {
+					TValueData valueData = toValueData(e.second);
+					entry.dataLength = valueData.size();
+					entry.initialDataLength = valueData.size();
+					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+				}
 
 				outFilePtr << entry;
 			}
