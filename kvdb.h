@@ -200,13 +200,9 @@ namespace kvdb {
 			return arrayOfByte;
 		}
 
-		static TValueData toValueData(V value) {
-			std::vector<byte> temp;
-
-			if (temp.size() < sizeof(value)) temp.resize(sizeof(value));
-			std::memcpy(temp.data(), &value, sizeof(value));
-
-			return temp;
+		static void toValueData(V value, TValueData& valueData) {
+			if (valueData.size() < sizeof(value)) valueData.resize(sizeof(value));
+			std::memcpy(valueData.data(), &value, sizeof(value));
 		}
 
 		void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData) {
@@ -466,11 +462,10 @@ namespace kvdb {
 			TKeyData keyData = toKeyData(k);
 			TValueData valueData;
 
-			// TODO fixme
 			if (typeid(v) == typeid(TValueData)) {
-				valueData = (TValueData)v;
+				valueData = std::move((TValueData)v);
 			} else {
-				valueData = toValueData(v);
+				toValueData(v, valueData);
 			}
 
 			if (!filePtr->is_open()) return;
@@ -517,18 +512,16 @@ namespace kvdb {
 				entry.freeKeyData = toKeyData(e.first);
 				entry.dataPos = dataBody.size() + bodyDataOffset;
 
-				// TODO fixme
+				TValueData valueData;
 				if (typeid(e.second) == typeid(TValueData)) {
-					const TValueData& valueData = (TValueData)e.second;
-					entry.dataLength = valueData.size();
-					entry.initialDataLength = valueData.size();
-					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+					valueData = std::move((TValueData)e.second);
 				} else {
-					TValueData valueData = toValueData(e.second);
-					entry.dataLength = valueData.size();
-					entry.initialDataLength = valueData.size();
-					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+					toValueData(e.second, valueData);
 				}
+
+				entry.dataLength = valueData.size();
+				entry.initialDataLength = valueData.size();
+				dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
 
 				outFilePtr << entry;
 			}
