@@ -200,13 +200,9 @@ namespace kvdb {
 			return arrayOfByte;
 		}
 
-		static TValueData toValueData(V value) {
-			std::vector<byte> temp;
-
-			if (temp.size() < sizeof(value)) temp.resize(sizeof(value));
-			std::memcpy(temp.data(), &value, sizeof(value));
-
-			return temp;
+		static void toValueData(V value, TValueData& valueData) {
+			if (valueData.size() < sizeof(value)) valueData.resize(sizeof(value));
+			std::memcpy(valueData.data(), &value, sizeof(value));
 		}
 
 		void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData) {
@@ -258,7 +254,7 @@ namespace kvdb {
 			TTableHeader tableHeader;
 			filePtr >> tableHeader;
 
-			for (int i = 0; i < tableHeader.recordCount; i++) {
+			for (unsigned int i = 0; i < tableHeader.recordCount; i++) {
 				ulong64 pos = (ulong64)filePtr->tellp();
 
 				TKeyEntry keyEntry;
@@ -268,13 +264,11 @@ namespace kvdb {
 
 				if (keyInfo().dataLength > 0) {
 					dataMap.insert({ keyEntry.freeKeyData, keyInfo });
-				}
-				else {
+				} else {
 					if (keyInfo().initialDataLength == 0) {
 						// reserved key slot
 						reservedKeyList.push_back(keyInfo);
-					}
-					else {
+					} else {
 						// marked as deleted pair
 						deletedKeyList.insert(keyInfo);
 					}
@@ -334,8 +328,7 @@ namespace kvdb {
 					itr = deletedKeyList.erase(itr);
 
 					return true;
-				}
-				else {
+				} else {
 					++itr;
 				}
 			}
@@ -351,8 +344,7 @@ namespace kvdb {
 			if (!tryWriteToSuitableDeletedPair(keyData, valueData)) {
 				if (hasReserved()) {
 					newPairFromReserved(keyData, valueData);
-				}
-				else {
+				} else {
 					createNewTable();
 					newPairFromReserved(keyData, valueData);
 				}
@@ -364,14 +356,12 @@ namespace kvdb {
 			if (valueData.size() > 0) {
 				if (keyInfo().dataLength >= valueData.size()) {
 					rewritePair(keyInfo, valueData);
-				}
-				else {
+				} else {
 					//remove old and create new
 					earsePair(keyInfo);
 					addNew(keyData, valueData);
 				}
-			}
-			else {
+			} else {
 				// erase
 				earsePair(keyInfo);
 			}
@@ -435,7 +425,7 @@ namespace kvdb {
 			filePtr->seekg(e.dataPos);
 
 			TValueDataPtr dataPtr = TValueDataPtr(new TValueData);
-			for (int i = 0; i < e.dataLength; i++) {
+			for (unsigned int i = 0; i < e.dataLength; i++) {
 				byte tmp;
 				read(filePtr, tmp);
 				dataPtr->push_back(tmp);
@@ -466,11 +456,10 @@ namespace kvdb {
 			TKeyData keyData = toKeyData(k);
 			TValueData valueData;
 
-			// TODO fixme
 			if (typeid(v) == typeid(TValueData)) {
-				valueData = (TValueData)v;
+				valueData = std::move((TValueData)v);
 			} else {
-				valueData = toValueData(v);
+				toValueData(v, valueData);
 			}
 
 			if (!filePtr->is_open()) return;
@@ -480,8 +469,7 @@ namespace kvdb {
 			if (got == dataMap.end()) {
 				// pair not found  
 				addNew(keyData, valueData);
-			}
-			else {
+			} else {
 				// pair found  
 				change(keyData, valueData);
 			}
@@ -517,18 +505,16 @@ namespace kvdb {
 				entry.freeKeyData = toKeyData(e.first);
 				entry.dataPos = dataBody.size() + bodyDataOffset;
 
-				// TODO fixme
+				TValueData valueData;
 				if (typeid(e.second) == typeid(TValueData)) {
-					const TValueData& valueData = e.second;
-					entry.dataLength = valueData.size();
-					entry.initialDataLength = valueData.size();
-					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+					valueData = std::move((TValueData)e.second);
 				} else {
-					TValueData valueData = toValueData(e.second);
-					entry.dataLength = valueData.size();
-					entry.initialDataLength = valueData.size();
-					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
+					toValueData(e.second, valueData);
 				}
+
+				entry.dataLength = valueData.size();
+				entry.initialDataLength = valueData.size();
+				dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
 
 				outFilePtr << entry;
 			}
