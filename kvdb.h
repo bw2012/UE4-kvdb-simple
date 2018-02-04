@@ -264,13 +264,11 @@ namespace kvdb {
 
 				if (keyInfo().dataLength > 0) {
 					dataMap.insert({ keyEntry.freeKeyData, keyInfo });
-				}
-				else {
+				} else {
 					if (keyInfo().initialDataLength == 0) {
 						// reserved key slot
 						reservedKeyList.push_back(keyInfo);
-					}
-					else {
+					} else {
 						// marked as deleted pair
 						deletedKeyList.insert(keyInfo);
 					}
@@ -330,8 +328,7 @@ namespace kvdb {
 					itr = deletedKeyList.erase(itr);
 
 					return true;
-				}
-				else {
+				} else {
 					++itr;
 				}
 			}
@@ -347,8 +344,7 @@ namespace kvdb {
 			if (!tryWriteToSuitableDeletedPair(keyData, valueData)) {
 				if (hasReserved()) {
 					newPairFromReserved(keyData, valueData);
-				}
-				else {
+				} else {
 					createNewTable();
 					newPairFromReserved(keyData, valueData);
 				}
@@ -360,14 +356,12 @@ namespace kvdb {
 			if (valueData.size() > 0) {
 				if (keyInfo().dataLength >= valueData.size()) {
 					rewritePair(keyInfo, valueData);
-				}
-				else {
+				} else {
 					//remove old and create new
 					earsePair(keyInfo);
 					addNew(keyData, valueData);
 				}
-			}
-			else {
+			} else {
 				// erase
 				earsePair(keyInfo);
 			}
@@ -475,8 +469,7 @@ namespace kvdb {
 			if (got == dataMap.end()) {
 				// pair not found  
 				addNew(keyData, valueData);
-			}
-			else {
+			} else {
 				// pair found  
 				change(keyData, valueData);
 			}
