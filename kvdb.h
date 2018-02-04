@@ -258,7 +258,7 @@ namespace kvdb {
 			TTableHeader tableHeader;
 			filePtr >> tableHeader;
 
-			for (int i = 0; i < tableHeader.recordCount; i++) {
+			for (unsigned int i = 0; i < tableHeader.recordCount; i++) {
 				ulong64 pos = (ulong64)filePtr->tellp();
 
 				TKeyEntry keyEntry;
@@ -435,7 +435,7 @@ namespace kvdb {
 			filePtr->seekg(e.dataPos);
 
 			TValueDataPtr dataPtr = TValueDataPtr(new TValueData);
-			for (int i = 0; i < e.dataLength; i++) {
+			for (unsigned int i = 0; i < e.dataLength; i++) {
 				byte tmp;
 				read(filePtr, tmp);
 				dataPtr->push_back(tmp);
@@ -519,7 +519,7 @@ namespace kvdb {
 
 				// TODO fixme
 				if (typeid(e.second) == typeid(TValueData)) {
-					const TValueData& valueData = e.second;
+					const TValueData& valueData = (TValueData)e.second;
 					entry.dataLength = valueData.size();
 					entry.initialDataLength = valueData.size();
 					dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
