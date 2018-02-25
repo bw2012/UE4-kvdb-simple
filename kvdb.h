@@ -19,8 +19,8 @@
 #include <cstring> 
 
 
-#define KVDB_KEY_SIZE 64
-#define KVDB_RESERVED_TABLE_SIZE 5
+#define KVDB_KEY_SIZE 12 // 3 x int32 (X, Y, Z)
+#define KVDB_RESERVED_TABLE_SIZE 1000
 
 typedef uint32_t uint32;
 typedef unsigned long long ulong64;
@@ -176,6 +176,9 @@ namespace kvdb {
 		std::set<TKeyEntryInfo, TKeyInfoComparatorByInitialLength> deletedKeyList;
 		std::list<TTableHeaderInfo> tableList;
 		mutable std::shared_mutex fileSharedMutex;
+		
+		uint32 reservedKeys = KVDB_RESERVED_TABLE_SIZE;
+		uint32 reservedValueSize = 0;
 
 	private:
 
@@ -285,12 +288,12 @@ namespace kvdb {
 
 			// write new table
 			TTableHeader newTable;
-			newTable.recordCount = KVDB_RESERVED_TABLE_SIZE;
+			newTable.recordCount = reservedKeys;
 			newTable.nextTable = 0;
 			filePtr << newTable;
 
 			// write reserved keys
-			for (int i = 0; i < KVDB_RESERVED_TABLE_SIZE; i++) {
+			for (int i = 0; i < reservedKeys; i++) {
 				int newReservedKeyPos = (int)filePtr->tellp();
 
 				TKeyEntry newReservedKey;
