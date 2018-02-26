@@ -229,17 +229,35 @@ namespace kvdb {
 			dataMap.erase(keyInfo().freeKeyData);
 		}
 
+		void expandValueData(const TValueData& valueDataSrc, TValueData& valueDataNew) {
+			valueDataNew.resize(reservedValueSize);
+			for (uint32 i = 0; i < reservedValueSize; i++){
+				if(i < valueDataSrc.size()){
+					valueDataNew[i] = valueDataSrc[i];	
+				} else {
+					valueDataNew[i] = 0;	
+				}
+			}
+		}
+
 		void newPairFromReserved(const TKeyData& keyData, const TValueData& valueData) {
 			// has reserved key slots
 			TKeyEntryInfo& keyInfo = reservedKeyList.front();
+			TValueData valueDataExp;
+			
+			if(valueData.size() < reservedValueSize){
+				expandValueData(valueData, valueDataExp);
+			} else {
+				valueDataExp = std::move(valueData);
+			}
 
 			filePtr->seekg(0, std::ios::end); // to end-of-file
 			ulong64 endFile = (ulong64)(filePtr->tellp());
-			filePtr->write((char*)valueData.data(), valueData.size());
+			filePtr->write((char*)valueDataExp.data(), valueDataExp.size());
 
 			// fill key data
 			keyInfo().dataLength = valueData.size(); // length
-			keyInfo().initialDataLength = valueData.size(); // length
+			keyInfo().initialDataLength = valueDataExp.size(); // length
 			keyInfo().dataPos = endFile;
 			keyInfo().freeKeyData = keyData;
 
@@ -293,8 +311,8 @@ namespace kvdb {
 			filePtr << newTable;
 
 			// write reserved keys
-			for (int i = 0; i < reservedKeys; i++) {
-				int newReservedKeyPos = (int)filePtr->tellp();
+			for (uint32 i = 0; i < reservedKeys; i++) {
+				uint32 newReservedKeyPos = (uint32)filePtr->tellp();
 
 				TKeyEntry newReservedKey;
 				filePtr << newReservedKey;
@@ -374,6 +392,10 @@ namespace kvdb {
 
 		KvFile() {
 			assert(sizeof(K) <= KVDB_KEY_SIZE);
+		}
+		
+		void setReservedValueSaize(uint32 val){
+			reservedValueSize = val;
 		}
 
 		void close() {
