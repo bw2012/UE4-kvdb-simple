@@ -375,7 +375,7 @@ namespace kvdb {
 		void change(const TKeyData& keyData, const TValueData& valueData) {
 			TKeyEntryInfo keyInfo = dataMap[keyData];
 			if (valueData.size() > 0) {
-				if (keyInfo().dataLength >= valueData.size()) {
+				if (keyInfo().initialDataLength >= valueData.size()) {
 					rewritePair(keyInfo, valueData);
 				} else {
 					//remove old and create new
