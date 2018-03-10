@@ -1,7 +1,6 @@
 #ifndef __H_KVDB__
 #define __H_KVDB__
 
-
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
@@ -344,6 +343,7 @@ namespace kvdb {
 				TKeyEntryInfo keyInfo = *itr;
 				if (keyInfo().initialDataLength >= valueData.size()) {
 					TKeyEntryInfo keyInfo = *itr;
+					keyInfo().freeKeyData = keyData;
 					rewritePair(keyInfo, valueData);
 					dataMap.insert({ keyInfo().freeKeyData, keyInfo });
 					itr = deletedKeyList.erase(itr);
