@@ -36,7 +36,7 @@ int main() {
 	bool ret = testDb.open(file);
 
   	// get value by key
-	std::shared_ptr<int> dataPtr = testDb.[key];
+	std::shared_ptr<int> dataPtr = testDb[key];
 	if (dataPtr != nullptr) {
 		printf("key -> %d --- val -> %d\n", key, *dataPtr.get());
 	} else {
