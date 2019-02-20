@@ -408,7 +408,7 @@ namespace kvdb {
 			tableList.clear();
 		}
 
-		bool open(std::string& file) {
+		bool open(const std::string& file) {
 			filePtr = new std::fstream(file, std::ios::in | std::ios::out | std::ios::binary);
 
 			if (!filePtr->is_open()) return false;
@@ -462,6 +462,11 @@ namespace kvdb {
 		std::shared_ptr<V> getVal(const K& k) {
 			return valueFromData(get(k));
 		}
+        
+        
+        std::shared_ptr<V> operator[] (const K& k) {
+            return valueFromData(get(k));
+        }
 
 		void erase(const K& k) {
 			TKeyData keyData = toKeyData(k);
@@ -500,7 +505,7 @@ namespace kvdb {
 			}
 		}
 
-		static bool create(std::string& file, const std::unordered_map<K, V>& test) {
+		static bool create(const std::string& file, const std::unordered_map<K, V>& test) {
 			std::ofstream outFile(file, std::ios::out | std::ios::binary);
 
 			if (!outFile) return false;
