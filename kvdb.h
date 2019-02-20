@@ -184,10 +184,13 @@ namespace kvdb {
 		std::shared_ptr<V> valueFromData(TValueDataPtr dataPtr) {
 			if (dataPtr == nullptr) return nullptr;
 
-			V* temp = new V();
-			memcpy(temp, dataPtr->data(), dataPtr->size());
-
-			return std::shared_ptr<V>(temp);
+			if constexpr (std::is_same_v<V, TValueData>) {
+				return std::static_pointer_cast<TValueData>(dataPtr);
+			} else {
+				V* temp = new V();
+				memcpy(temp, dataPtr->data(), dataPtr->size());
+				return std::shared_ptr<V>(temp);
+			}
 		}
 
 		static TKeyData toKeyData(K key) {
@@ -269,7 +272,7 @@ namespace kvdb {
 		}
 
 		ulong64 readTable() {
-			int tablePos = (int)filePtr->tellp();
+			ulong64 tablePos = (ulong64)filePtr->tellp();
 
 			TTableHeader tableHeader;
 			filePtr >> tableHeader;
@@ -301,7 +304,7 @@ namespace kvdb {
 
 		void createNewTable() {
 			filePtr->seekg(0, std::ios::end); // to end-of-file
-			int newTablePos = (int)filePtr->tellp();
+			ulong64 newTablePos = (ulong64)filePtr->tellp();
 
 			// write new table
 			TTableHeader newTable;
@@ -481,12 +484,11 @@ namespace kvdb {
 			}
 		}
 
-
 		void put(const K& k, const V& v) {
 			TKeyData keyData = toKeyData(k);
 			TValueData valueData;
 
-			if (typeid(v) == typeid(TValueData)) {
+			if constexpr(std::is_same_v<V, TValueData>) {
 				valueData = std::move((TValueData)v);
 			} else {
 				toValueData(v, valueData);
@@ -526,7 +528,7 @@ namespace kvdb {
 			tableHeader.recordCount = keyRecords;
 			outFilePtr << tableHeader;
 
-			int bodyDataOffset = (int)(outFile.tellp()) + sizeof(TKeyEntry) * keyRecords;
+			ulong64 bodyDataOffset = (ulong64)(outFile.tellp()) + sizeof(TKeyEntry) * keyRecords;
 
 			std::vector<byte> dataBody;
 
@@ -536,7 +538,7 @@ namespace kvdb {
 				entry.dataPos = dataBody.size() + bodyDataOffset;
 
 				TValueData valueData;
-				if (typeid(e.second) == typeid(TValueData)) {
+				if constexpr (std::is_same_v<V, TValueData>) {
 					valueData = std::move((TValueData)e.second);
 				} else {
 					toValueData(e.second, valueData);
