@@ -396,6 +396,10 @@ namespace kvdb {
 		KvFile() {
 			assert(sizeof(K) <= KVDB_KEY_SIZE);
 		}
+        
+        ~KvFile() {
+			close();
+		}
 		
 		void setReservedValueSaize(uint32 val){
 			reservedValueSize = val;
