@@ -401,7 +401,7 @@ namespace kvdb {
 			close();
 		}
 		
-		void setReservedValueSaize(uint32 val){
+		void setReservedValueSize(uint32 val){
 			reservedValueSize = val;
 		}
 
