@@ -440,7 +440,7 @@ namespace kvdb {
 			}
 		}
 
-		TValueDataPtr get(const K& k) {
+		TValueDataPtr loadData(const K& k) {
 			TKeyData keyData = toKeyData(k);
 
 			if (!filePtr->is_open()) return nullptr;
@@ -466,13 +466,13 @@ namespace kvdb {
 			return dataPtr;
 		}
 
-		std::shared_ptr<V> getVal(const K& k) {
-			return valueFromData(get(k));
+		std::shared_ptr<V> load(const K& k) {
+			return valueFromData(loadData(k));
 		}
         
         
         std::shared_ptr<V> operator[] (const K& k) {
-            return valueFromData(get(k));
+            return valueFromData(loadData(k));
         }
 
 		void erase(const K& k) {
@@ -488,7 +488,7 @@ namespace kvdb {
 			}
 		}
 
-		void put(const K& k, const V& v) {
+		void save(const K& k, const V& v) {
 			TKeyData keyData = toKeyData(k);
 			TValueData valueData;
 
