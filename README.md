@@ -47,7 +47,7 @@ int main() {
 	testDb.erase(5);
 
   	// add/edit key-value paid to db file
-	testDb.put(5, 777000);
+	testDb.save(5, 777000);
 	
   	// close db file
 	testDb.close();
