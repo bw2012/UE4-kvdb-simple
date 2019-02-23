@@ -1,6 +1,6 @@
 # kvdb
 
-Small and simple key-value binary storage. 
+Small and simple key-value binary file storage. 
 
 * key-value storage
 * based on unordered_map and random access file
