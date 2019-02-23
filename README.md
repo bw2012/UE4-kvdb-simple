@@ -10,6 +10,10 @@ Small and simple key-value binary storage.
 * all value stored in file and can be loaded by request
 * no memory cache
 
+# Warning
+
+C++17 required
+
 # Usage
 
 
