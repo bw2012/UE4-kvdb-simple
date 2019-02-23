@@ -14,6 +14,8 @@ Small and simple key-value binary file storage.
 
 C++17 required
 
+How to enable c++17 in UE4 project: https://gist.github.com/bw2012/069bcb43d0983217dc36f782fc2f1bcc
+
 # Usage
 
 
