@@ -15,13 +15,15 @@
 #include <type_traits>
 #include <cassert>
 #include <cstring> 
-#include <functional> 
+#include <functional>
+#include <cmath>
 
 #define KVDB_KEY_SIZE 12 // 3 x int32 (X, Y, Z)
 #define KVDB_RESERVED_TABLE_SIZE 1000
 #define KVDB_MIN_DATA_SIZE 256
 
 typedef uint32_t uint32;
+typedef uint16_t uint16;
 typedef unsigned long long ulong64;
 typedef unsigned char byte;
 
@@ -87,7 +89,7 @@ namespace kvdb {
 	// File header
 	//============================================================================
 	typedef struct TFileHeader {
-		uint32 version = 1;
+		uint32 version = 2;
 		uint32 keySize = 0;
 		ulong64 timestamp = 0;
 		uint32  endOfHeaderOffset = 0;
@@ -131,6 +133,7 @@ namespace kvdb {
 		ulong64 dataLength = 0;
 		ulong64 initialDataLength = 0;
 		TKeyData freeKeyData;
+		uint16 flags = 0;
 	} TKeyEntry;
 
 	typedef TPosWrapper<TKeyEntry> TKeyEntryInfo;
@@ -172,7 +175,7 @@ namespace kvdb {
 		std::list<TTableHeaderInfo> tableList;
 		mutable std::mutex fileSharedMutex;
 
-		uint32 reservedKeys = KVDB_RESERVED_TABLE_SIZE;
+		const uint32 reservedKeys = KVDB_RESERVED_TABLE_SIZE;
 		const uint32 reservedValueSize = 0;
 
 	private:
@@ -206,18 +209,20 @@ namespace kvdb {
 			std::memcpy(valueData.data(), &value, sizeof(value));
 		}
 
-		void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData) {
+		void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData, const uint16 k_flags) {
 			// rewrite value data
 			filePtr->seekp(keyInfo().dataPos);
 			filePtr->write((char*)valueData.data(), valueData.size());
 			// rewrite key data
 			keyInfo().dataLength = valueData.size(); // new length
+			keyInfo().flags = k_flags;
 			filePtr << keyInfo;
 		}
 
 		void earsePair(TKeyEntryInfo& keyInfo) {
 			// rewrite key data
 			keyInfo().dataLength = 0; // new length
+			keyInfo().flags = 0;
 			filePtr << keyInfo;
 			deletedKeyList.insert(keyInfo);
 			dataMap.erase(keyInfo().freeKeyData);
@@ -229,7 +234,7 @@ namespace kvdb {
 			std::memcpy(valueDataNew.data(), valueDataSrc.data(), valueDataSrc.size());
 		}
 
-		void newPairFromReserved(const TKeyData& keyData, const TValueData& valueData) {
+		void newPairFromReserved(const TKeyData& keyData, const TValueData& valueData, const uint16 k_flags) {
 			// has reserved key slots
 			TKeyEntryInfo& keyInfo = reservedKeyList.front();
 			TValueData valueDataExp;
@@ -250,6 +255,7 @@ namespace kvdb {
 			keyInfo().initialDataLength = valueDataExp.size(); // length
 			keyInfo().dataPos = endFile;
 			keyInfo().freeKeyData = keyData;
+			keyInfo().flags = k_flags;
 			filePtr << keyInfo;
 
 			// add new pair to table 
@@ -321,12 +327,13 @@ namespace kvdb {
 			return reservedKeyList.size() > 0;
 		}
 
-		bool tryWriteToSuitableDeletedPair(const TKeyData& keyData, const TValueData& valueData) {
+		bool tryWriteToSuitableDeletedPair(const TKeyData& keyData, const TValueData& valueData, const uint16 k_flags) {
 			for (auto itr = deletedKeyList.begin(); itr != deletedKeyList.end();) {
 				TKeyEntryInfo keyInfo = *itr;
 				if (keyInfo().initialDataLength >= valueData.size()) {
 					keyInfo().freeKeyData = keyData;
-					rewritePair(keyInfo, valueData);
+					keyInfo().flags = k_flags;
+					rewritePair(keyInfo, valueData, k_flags);
 					dataMap.insert({ keyInfo().freeKeyData, keyInfo });
 					itr = deletedKeyList.erase(itr);
 					return true;
@@ -337,30 +344,26 @@ namespace kvdb {
 			return false;
 		}
 
-		void addNew(const TKeyData& keyData, const TValueData& valueData) {
-			if (valueData.size() == 0) {
-				return;
-			}
-
-			if (!tryWriteToSuitableDeletedPair(keyData, valueData)) {
+		void addNew(const TKeyData& keyData, const TValueData& valueData, const uint16 k_flags) {
+			if (!tryWriteToSuitableDeletedPair(keyData, valueData, k_flags)) {
 				if (hasReserved()) {
-					newPairFromReserved(keyData, valueData);
+					newPairFromReserved(keyData, valueData, k_flags);
 				} else {
 					createNewTable();
-					newPairFromReserved(keyData, valueData);
+					newPairFromReserved(keyData, valueData, k_flags);
 				}
 			}
 		}
 
-		void change(const TKeyData& keyData, const TValueData& valueData) {
+		void change(const TKeyData& keyData, const TValueData& valueData, const uint16 k_flags) {
 			TKeyEntryInfo& keyInfo = dataMap[keyData];
 			if (valueData.size() > 0) {
 				if (keyInfo().initialDataLength >= valueData.size()) {
-					rewritePair(keyInfo, valueData);
+					rewritePair(keyInfo, valueData, k_flags);
 				} else {
 					//remove old and create new
 					earsePair(keyInfo);
-					addNew(keyData, valueData);
+					addNew(keyData, valueData, k_flags);
 				}
 			} else {
 				// erase
@@ -433,18 +436,30 @@ namespace kvdb {
 			for (const auto& kv : dataMap) { func(keyFromKeyData(kv.first)); }
 		}
 
-		TValueDataPtr loadData(const K& k) {
-			TKeyData keyData = toKeyData(k);
+		uint16 k_flags(const K& k) {
+			if (!isOpen()) return 0;
 
+			const TKeyData keyData = toKeyData(k);
+			std::lock_guard<std::mutex> guard(fileSharedMutex);
+
+			if (auto a = dataMap.find(keyData); a != dataMap.end()) {
+				const auto ki = a->second;
+				return ki().flags;
+			}
+			
+			return 0;
+		}
+
+		TValueDataPtr loadData(const K& k) {
 			if (!isOpen()) return nullptr;
+
+			const TKeyData keyData = toKeyData(k);
 			std::lock_guard<std::mutex> guard(fileSharedMutex);
 
 			auto got = dataMap.find(keyData);
-			if (got == dataMap.end()) {
-				return nullptr;
-			}
+			if (got == dataMap.end()) return nullptr;
 
-			TKeyEntryInfo& i = dataMap[keyData];
+			TKeyEntryInfo& i = got->second;
 			const TKeyEntry& e = i();
 
 			filePtr->seekg(e.dataPos);
@@ -473,14 +488,12 @@ namespace kvdb {
 			if (!isOpen()) return;
 			std::lock_guard<std::mutex> guard(fileSharedMutex);
 
-			auto got = dataMap.find(keyData);
-			if (got != dataMap.end()) {
-				TKeyEntryInfo keyInfo = dataMap[keyData];
-				earsePair(keyInfo);
+			if (auto i = dataMap.find(keyData); i != dataMap.end()) {
+				earsePair(i->second);
 			}
 		}
 
-		void save(const K& k, const V& v) {
+		void save(const K& k, const V& v, const uint16 k_flags = 0x0) {
 			TKeyData keyData = toKeyData(k);
 			TValueData valueData;
 
@@ -493,31 +506,24 @@ namespace kvdb {
 			if (!isOpen()) return;
 			std::lock_guard<std::mutex> guard(fileSharedMutex);
 
-			std::unordered_map<TKeyData, TKeyEntryInfo>::const_iterator got = dataMap.find(keyData);
-			if (got == dataMap.end()) {
+			if (dataMap.find(keyData) == dataMap.end()) {
 				// pair not found  
-				addNew(keyData, valueData);
+				addNew(keyData, valueData, k_flags);
 			} else {
 				// pair found 
-				change(keyData, valueData);
+				change(keyData, valueData, k_flags);
 			}
 		}
 
-		static bool create(const std::string& file, const std::unordered_map<K, V>& test) {
+		static bool create(const std::string& file, const std::unordered_map<K, V>& test, ulong64 max_key_records = KVDB_RESERVED_TABLE_SIZE) {
 			std::ofstream outFile(file, std::ios::out | std::ios::binary);
-
 			if (!outFile) return false;
-
 			std::ofstream* outFilePtr = &outFile;
 
-			static const ulong64 max_key_records = KVDB_RESERVED_TABLE_SIZE;
 			const ulong64 keyRecords = (test.size() > max_key_records) ? test.size() : max_key_records;
 
 			// save file header
-			TFileHeader fileHeader;
-			fileHeader.keySize = KVDB_KEY_SIZE;
-			fileHeader.endOfHeaderOffset = sizeof(fileHeader);
-
+			TFileHeader fileHeader{ .keySize = KVDB_KEY_SIZE, .endOfHeaderOffset = sizeof(fileHeader) };
 			outFilePtr << fileHeader;
 
 			TTableHeader tableHeader{keyRecords, 0};
@@ -526,10 +532,7 @@ namespace kvdb {
 			ulong64 bodyDataOffset = (ulong64)(outFile.tellp()) + sizeof(TKeyEntry) * keyRecords;
 			std::vector<byte> dataBody;
 			for (auto& e : test) {
-				TKeyEntry entry;
-				entry.freeKeyData = toKeyData(e.first);
-				entry.dataPos = dataBody.size() + bodyDataOffset;
-
+				TKeyEntry entry{ .dataPos = dataBody.size() + bodyDataOffset, .freeKeyData = toKeyData(e.first) };
 				TValueData valueData;
 				if constexpr (std::is_same<V, TValueData>::value) {
 					valueData = static_cast<TValueData>(e.second);
@@ -559,22 +562,27 @@ namespace kvdb {
 
 
 		// ====================================================================================
-		void test() {
-
+		void info(std::vector<TKeyEntry>& active, std::vector<TKeyEntry>& reserve, std::vector<TKeyEntry>& deleted) {
+			if (!isOpen()) return;
+			std::lock_guard<std::mutex> guard(fileSharedMutex);
+			
+			active.clear();
+			active.reserve(dataMap.size());
 			for (auto& kv : dataMap) {
-				auto v = kv.second;
-				printf("%ld <- %ld\n", v().dataLength, v().initialDataLength);
+				active.push_back(kv.second());
 			}
 
+			reserve.clear();
+			reserve.reserve(reservedKeyList.size());
 			for (auto& r : reservedKeyList) {
-				//printf("reserved: %ld\n", r.pos);
+				reserve.push_back(r());
 			}
 
+			deleted.clear();
+			deleted.reserve(deleted.size());
 			for (auto& r : deletedKeyList) {
-				//printf("deleted: %ld\n", r.pos);
+				deleted.push_back(r());
 			}
-
-
 		}
 		// ====================================================================================
 
