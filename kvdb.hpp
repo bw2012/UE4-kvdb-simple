@@ -253,7 +253,7 @@ namespace kvdb {
 			// fill key data
 			keyInfo().dataLength = valueData.size(); // length
 			keyInfo().initialDataLength = valueDataExp.size(); // length
-			keyInfo().dataPos = endFile;
+			keyInfo().dataPos = (valueData.size() > 0) ? endFile : 1; // allow zero length value
 			keyInfo().freeKeyData = keyData;
 			keyInfo().flags = k_flags;
 			filePtr << keyInfo;
@@ -275,15 +275,13 @@ namespace kvdb {
 				filePtr >> keyEntry;
 				TKeyEntryInfo keyInfo(keyEntry, pos);
 
-				if (keyInfo().dataLength > 0) {
+				if (keyInfo().dataLength > 0) { // allow zero length value
 					dataMap.insert({ keyEntry.freeKeyData, keyInfo });
 				} else {
-					if (keyInfo().initialDataLength == 0) {
-						// reserved key slot
-						reservedKeyList.push_back(keyInfo);
+					if (keyInfo().initialDataLength == 0 && keyInfo().dataPos == 0) { // zero length data
+						reservedKeyList.push_back(keyInfo); // reserved key slot
 					} else {
-						// marked as deleted pair
-						deletedKeyList.insert(keyInfo);
+						deletedKeyList.insert(keyInfo); // marked as deleted pair
 					}
 				}
 			}
@@ -562,6 +560,15 @@ namespace kvdb {
 
 
 		// ====================================================================================
+		
+		size_t reserved() {
+			return reservedKeyList.size();
+		}		
+		
+		size_t deleted() {
+			return deletedKeyList.size();
+		}	
+		
 		void info(std::vector<TKeyEntry>& active, std::vector<TKeyEntry>& reserve, std::vector<TKeyEntry>& deleted) {
 			if (!isOpen()) return;
 			std::lock_guard<std::mutex> guard(fileSharedMutex);
@@ -579,7 +586,7 @@ namespace kvdb {
 			}
 
 			deleted.clear();
-			deleted.reserve(deleted.size());
+			deleted.reserve(deletedKeyList.size());
 			for (auto& r : deletedKeyList) {
 				deleted.push_back(r());
 			}
