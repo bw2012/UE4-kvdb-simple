@@ -1,2 +1,8 @@
 vs2015_proj
 vs2017_proj
+
+*.o
+*.dat
+test_kvdb
+
+
