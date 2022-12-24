@@ -26,7 +26,7 @@ void print_assert(bool b, std::string text) {
     if(b){ 
         printf("\033[3;42;30m PASS \033[0m ");
     } else {
-		printf("\033[3;41;30m FAIL \033[0m ");    
+	printf("\033[3;41;30m FAIL \033[0m ");    
     }
     
     printf("%s \n", text.c_str());    
