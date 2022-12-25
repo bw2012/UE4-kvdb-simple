@@ -275,11 +275,15 @@ namespace kvdb {
 				filePtr >> keyEntry;
 				TKeyEntryInfo keyInfo(keyEntry, pos);
 
-				if (keyInfo().dataLength > 0) { // allow zero length value
+				if (keyInfo().dataLength > 0) { 
 					dataMap.insert({ keyEntry.freeKeyData, keyInfo });
 				} else {
-					if (keyInfo().initialDataLength == 0 && keyInfo().dataPos == 0) { // zero length data
-						reservedKeyList.push_back(keyInfo); // reserved key slot
+					if (keyInfo().initialDataLength == 0) { 
+						if(keyInfo().dataPos == 1){ 
+							dataMap.insert({ keyEntry.freeKeyData, keyInfo }); // key with zero length data
+						} else {
+							reservedKeyList.push_back(keyInfo); // reserved key slot
+						}
 					} else {
 						deletedKeyList.insert(keyInfo); // marked as deleted pair
 					}

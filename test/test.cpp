@@ -23,17 +23,23 @@ struct TTT {
     }
 };
 
-struct TTestItem {
+struct TTestStructItem {
     TVoxelIndex key;
     TTT value;
     uint16 flags;
 };
 
-std::unordered_map<TVoxelIndex, TTestItem> global_test_map;
+struct TTestDataItem {
+    TVoxelIndex key;
+    TValueData data;
+    uint16 flags;
+};
+
+std::unordered_map<TVoxelIndex, TTestStructItem> global_test_map;
 
 void print_test_name(std::string name, std::string description) {
-    printf("\033[3;104;30m %s \033[0m\t\t \n", name.c_str());
-    printf("%s\n", description.c_str());
+    printf("\033[3;104;30m %s \033[0m   ", name.c_str());
+    printf("%s\n\n", description.c_str());
 }
 
 
@@ -41,6 +47,7 @@ void print_assert(bool b, std::string text) {
     if(b){ 
         printf("\033[3;42;30m PASS \033[0m ");
     } else {
+
         printf("\033[3;41;30m FAIL \033[0m ");    
     }
     
@@ -78,8 +85,8 @@ void test1() {
     kv_file1.save(key1, test1);
     kv_file1.save(key2, test2, 100);
     
-    global_test_map.insert({key1, TTestItem{ key1, test1, 0}});
-    global_test_map.insert({key2, TTestItem{ key2, test2, 100}});
+    global_test_map.insert({key1, TTestStructItem{ key1, test1, 0}});
+    global_test_map.insert({key2, TTestStructItem{ key2, test2, 100}});
         
     print_assert(s == 0, "Check file size");
 
@@ -167,7 +174,7 @@ void test3() {
                 TVoxelIndex index(x, y, z);
                 TTT test{ 1.f / (float)x, 2 / (float)x, 3 / (float)x, 4 / (float)x };
                 
-                global_test_map[index] = TTestItem{index, test, f};
+                global_test_map[index] = TTestStructItem{index, test, f};
                 
                 kv_file.save(index, test, f);
                 i++;  
@@ -183,7 +190,7 @@ void test3() {
 
 //=====================================================================================
 
-void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, TTestItem>& test_map){
+void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, TTestStructItem>& test_map){
     kvdb::KvFile<TVoxelIndex, TTT> kv_file;
     bool is_exist = kv_file.open(file_name);
    
@@ -205,7 +212,6 @@ void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, T
         TTT c = *ptr;
                
         ok = (ptr != nullptr) && (f == flags) && (c == value);
- 
         if(!ok){
             printf("fail: %d\n", i);
             printf("key: %d %d %d \n", key.X, key.Y, key.Z);
@@ -229,56 +235,91 @@ void test4() {
 }
 
 //=====================================================================================
+// test null values
+//=====================================================================================
 
-void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTT>& test_set, int& created_elements){
+void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTestDataItem>& test_set, int& created_elements){
     std::remove(file_name.c_str());
 
     printf("Create new empty file\n");
-    const std::unordered_map<TVoxelIndex, TTT> empty;
-    kvdb::KvFile<TVoxelIndex, TTT>::create(file_name, empty);
+    const std::unordered_map<TVoxelIndex, TValueData> empty;
+    kvdb::KvFile<TVoxelIndex, TValueData>::create(file_name, empty);
 
-    kvdb::KvFile<TVoxelIndex, TTT> kv_file;
+    kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
     bool is_exist = kv_file.open(file_name);
-    //print_assert(is_exist, "Open file");
+
+    TValueData zero_data;
+    zero_data.resize(0);
 
     int n = 10;
     for(int x = 0; x < n; x++){
         TVoxelIndex index(x, 0, 0);
-        TTT test{ 1.f / (float)x, 2 / (float)x, 3 / (float)x, 4 / (float)x };
-        test_set.insert({index, test});
-        kv_file.save(index, test);
+        test_set.insert({index, TTestDataItem{index, zero_data, (uint16)n} });
+        kv_file.save(index, zero_data, (uint16)n);
     }
     
-    created_elements = n;
+    print_assert(kv_file.size() == n, "File size");
+    print_assert(kv_file.reserved() == 990, "Reserved");
     
+    created_elements = n;
     kv_file.close();
 }
 
- void test_erase() {
-    print_test_name("Test#", "Erase elements...");
+ void test_null_val1() {
+    print_test_name("Test#5", "Zero length values...");
 
     std::string file_name = "test2.dat";
-    std::unordered_map<TVoxelIndex, TTT> test_set;
+    std::unordered_map<TVoxelIndex, TTestDataItem> test_set;
     int n;
 
     createTestFile(file_name, test_set, n);
 
-    kvdb::KvFile<TVoxelIndex, TTT> kv_file;
+    kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
     bool is_exist = kv_file.open(file_name);
     print_assert(is_exist, "Open file");
     
+    printf("File size: %d \n", (int)kv_file.size());
+    
     print_assert(kv_file.size() == n, "File size");
-
+    print_assert(kv_file.reserved() == 990, "Reserved");
+    
+    int i = 0;
+    bool ok = true;
+    for(const auto& a : test_set){
+        const auto& ti = a.second;
+        
+        auto ptr = kv_file.load(ti.key);     
+        auto f = kv_file.k_flags(ti.key);
+        
+        ok = (ptr != nullptr) && (f == ti.flags);
+        if(!ok){
+            printf("fail: %d\n", i);
+            printf("key: %d %d %d \n", ti.key.X, ti.key.Y, ti.key.Z);
+            printf("flag: %d %d\n", f, ti.flags);            
+            break;
+        }
+        
+        i++;
+    }
+    
+    print_assert(ok, "Check values");
     printf("=========================== \n\n");
 }
 
 //=====================================================================================
 
 int main() {
+    printf("\nRun KVDB tests... \n\n");
+    
+    
+    // basic functionality
     test1();
     test2();
     test3();
     test4();
+    
+    // keys with zero leength values
+    test_null_val1();
     
     printf("\n");
 }
