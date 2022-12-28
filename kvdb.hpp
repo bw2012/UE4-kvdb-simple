@@ -76,7 +76,7 @@ namespace kvdb {
 		T objT;
 
 	public:
-		ulong64 pos;
+		ulong64 pos = 0;
 
 		TPosWrapper() {};
 		TPosWrapper(T t, ulong64 p) : objT(t), pos(p) {};
@@ -176,7 +176,7 @@ namespace kvdb {
 		mutable std::mutex fileSharedMutex;
 
 		const uint32 reservedKeys = KVDB_RESERVED_TABLE_SIZE;
-		const uint32 reservedValueSize = 0;
+		const volatile uint32 reservedValueSize = 0; // kek
 
 	private:
 
@@ -241,7 +241,7 @@ namespace kvdb {
 
 			if (reservedValueSize > 0) {
 				uint32 n = (uint32)std::round((float)valueData.size() / (float)reservedValueSize) + 1;
-				expandValueData(valueData, valueDataExp, n * reservedValueSize);
+				expandValueData(valueData, valueDataExp, (ulong64)n * (ulong64)reservedValueSize);
 			} else {
 				valueDataExp = std::move(valueData);
 			}
@@ -325,7 +325,7 @@ namespace kvdb {
 			tableList.push_back(TTableHeaderInfo(newTable, newTablePos));
 		}
 
-		bool hasReserved() {
+		bool hasReserved() const {
 			return reservedKeyList.size() > 0;
 		}
 
@@ -379,7 +379,7 @@ namespace kvdb {
 			assert(sizeof(K) <= KVDB_KEY_SIZE);
 		}
 
-		KvFile(uint32 s) : reservedValueSize(s) {
+		explicit KvFile(uint32 s) : reservedValueSize(s) {
 			assert(sizeof(K) <= KVDB_KEY_SIZE);
 		}
 
@@ -551,7 +551,7 @@ namespace kvdb {
 			if (test.size() < max_key_records) {
 				// add empty records
 				const ulong64 emptyRecords = max_key_records - test.size();
-				for (int i = 0; i < emptyRecords; i++) {
+				for (ulong64 i = 0; i < emptyRecords; i++) {
 					TKeyEntry entry;
 					outFilePtr << entry;
 				}
@@ -565,11 +565,11 @@ namespace kvdb {
 
 		// ====================================================================================
 		
-		size_t reserved() {
+		size_t reserved() const {
 			return reservedKeyList.size();
 		}		
 		
-		size_t deleted() {
+		size_t deleted() const {
 			return deletedKeyList.size();
 		}	
 		
@@ -579,21 +579,15 @@ namespace kvdb {
 			
 			active.clear();
 			active.reserve(dataMap.size());
-			for (auto& kv : dataMap) {
-				active.push_back(kv.second());
-			}
+			std::for_each(dataMap.cbegin(), dataMap.cend(), [&](const auto& p){ active.push_back(p.second()); });
 
 			reserve.clear();
 			reserve.reserve(reservedKeyList.size());
-			for (auto& r : reservedKeyList) {
-				reserve.push_back(r());
-			}
-
+			std::for_each(reservedKeyList.cbegin(), reservedKeyList.cend(), [&](const auto& p){ reserve.push_back(p); });
+            
 			deleted.clear();
 			deleted.reserve(deletedKeyList.size());
-			for (auto& r : deletedKeyList) {
-				deleted.push_back(r());
-			}
+			std::for_each(deletedKeyList.cbegin(), deletedKeyList.cend(), [&](const auto& p){ deleted.push_back(p); });
 		}
 		// ====================================================================================
 

@@ -247,6 +247,7 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
 
     kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
     bool is_exist = kv_file.open(file_name);
+    print_assert(is_exist, "File created");
 
     TValueData zero_data;
     zero_data.resize(0);
@@ -258,7 +259,7 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
         kv_file.save(index, zero_data, (uint16)n);
     }
     
-    print_assert(kv_file.size() == n, "File size");
+    print_assert((int)kv_file.size() == n, "File size");
     print_assert(kv_file.reserved() == 990, "Reserved");
     
     created_elements = n;
@@ -280,7 +281,7 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
     
     printf("File size: %d \n", (int)kv_file.size());
     
-    print_assert(kv_file.size() == n, "File size");
+    print_assert((int)kv_file.size() == n, "File size");
     print_assert(kv_file.reserved() == 990, "Reserved");
     
     int i = 0;
