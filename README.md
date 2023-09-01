@@ -4,4 +4,8 @@
 
 Small and simple key-value binary file storage. 
 
+initially was designed to store voxel data in UE4 
+
+September 2017
+
 
