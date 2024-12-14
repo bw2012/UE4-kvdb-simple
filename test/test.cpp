@@ -70,7 +70,7 @@ void test1(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
     kvdb::KvFile<TVoxelIndex, TTT>::create(file_name, empty);
 
     kvdb::KvFile<TVoxelIndex, TTT> kv_file1;
-    bool is_exist = kv_file1.open(file_name);
+    bool is_exist = (kv_file1.open(file_name) == KVDB_OK);
     print_assert(is_exist, "Open file");
 
     int s = kv_file1.size();
@@ -118,7 +118,7 @@ void test2(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
     std::string file_name = TEST_FILE1;
 
     kvdb::KvFile<TVoxelIndex, TTT> kv_file;
-    bool is_exist = kv_file.open(file_name);
+    bool is_exist = (kv_file.open(file_name) == KVDB_OK);
     print_assert(is_exist, "Open file");
 
     int s = kv_file.size();
@@ -159,7 +159,7 @@ void test3(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
     std::string file_name = TEST_FILE1;
 
     kvdb::KvFile<TVoxelIndex, TTT> kv_file;
-    bool is_exist = kv_file.open(file_name);
+    bool is_exist = (kv_file.open(file_name) == KVDB_OK);
 
     print_assert(is_exist, "Open file");
     print_assert(kv_file.size() == 2, "File size");
@@ -193,7 +193,7 @@ void test3(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
 
 void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, TTestStructItem> &test_map) {
     kvdb::KvFile<TVoxelIndex, TTT> kv_file;
-    bool is_exist = kv_file.open(file_name);
+    bool is_exist = (kv_file.open(file_name) == KVDB_OK);
 
     print_assert(is_exist, "Open file");
 
@@ -247,7 +247,7 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
     kvdb::KvFile<TVoxelIndex, TValueData>::create(file_name, empty);
 
     kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
-    bool is_exist = kv_file.open(file_name);
+    bool is_exist = (kv_file.open(file_name) == KVDB_OK);
     print_assert(is_exist, "File created");
 
     TValueData zero_data;
@@ -317,7 +317,7 @@ void test_null_val1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map
     createTestFile(file_name, test_data_map, n, 3);
 
     kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
-    bool is_exist = kv_file.open(file_name);
+    bool is_exist = (kv_file.open(file_name) == KVDB_OK);
     print_assert(is_exist, "Open file");
 
     printf("File size: %d \n", (int)kv_file.size());

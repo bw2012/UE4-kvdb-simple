@@ -26,6 +26,13 @@
 #define KVDB_RESERVED_TABLE_SIZE 1000
 #define KVDB_MIN_DATA_SIZE 256
 
+#define KVDB_FILE_VERSION 2
+
+#define KVDB_OK 0
+#define KVDB_ERROR_OPEN_FILE -1
+#define KVDB_ERROR_INCORRECT_FILE_VERSION -2
+
+
 typedef uint32_t uint32;
 typedef uint16_t uint16;
 typedef unsigned long long ulong64;
@@ -93,7 +100,7 @@ namespace kvdb {
 	// File header
 	//============================================================================
 	typedef struct TFileHeader {
-		uint32 version = 2;
+		uint32 version = KVDB_FILE_VERSION;
 		uint32 keySize = 0;
 		ulong64 timestamp = 0;
 		uint32  endOfHeaderOffset = 0;
@@ -404,13 +411,18 @@ namespace kvdb {
 			return filePtr && filePtr->is_open();
 		}
 
-		bool open(const std::string& file) {
+		int open(const std::string& file) {
 			filePtr = new std::fstream(file, std::ios::in | std::ios::out | std::ios::binary);
 
-			if (!isOpen()) return false;
+			if (!isOpen()) return KVDB_ERROR_OPEN_FILE;
 
 			TFileHeader fileHeader;
 			filePtr >> fileHeader;
+
+			if(fileHeader.version != KVDB_FILE_VERSION){
+				filePtr->close();
+				return KVDB_ERROR_INCORRECT_FILE_VERSION;
+			}
 
 			ulong64 nextTablePos = readTable();
 			while (nextTablePos > 0) {
@@ -418,7 +430,7 @@ namespace kvdb {
 				nextTablePos = readTable();
 			}
 
-			return true;
+			return KVDB_OK;
 		}
 
 		size_t size() {
