@@ -1,5 +1,5 @@
 
-CC = g++-12
+CC = g++
 CFLAGS = -std=c++20 -Wall
 CLIBS = -lstdc++ 
 

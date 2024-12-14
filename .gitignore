@@ -4,5 +4,5 @@ vs2017_proj
 *.o
 *.dat
 test_kvdb
-
+.vscode/
 

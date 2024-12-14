@@ -184,7 +184,7 @@ namespace kvdb {
 
 	private:
 
-		std::shared_ptr<V> valueFromData(TValueDataPtr dataPtr) {
+		std::shared_ptr<V> valueFromData(TValueDataPtr dataPtr) const {
 			if (dataPtr == nullptr) return nullptr;
 
 			if constexpr (std::is_same<V, TValueData>::value) { //constexpr
@@ -442,7 +442,7 @@ namespace kvdb {
 			for (const auto& kv : dataMap) { func(keyFromKeyData(kv.first)); }
 		}
 
-		uint16 k_flags(const K& k) {
+		uint16 k_flags(const K& k) const {
 			if (!isOpen()) return 0;
 
 			const TKeyData keyData = toKeyData(k);
@@ -456,7 +456,7 @@ namespace kvdb {
 			return 0;
 		}
 
-		TValueDataPtr loadData(const K& k) {
+		TValueDataPtr loadData(const K& k) const {
 			if (!isOpen()) return nullptr;
 
 			const TKeyData keyData = toKeyData(k);
@@ -465,7 +465,7 @@ namespace kvdb {
 			auto got = dataMap.find(keyData);
 			if (got == dataMap.end()) return nullptr;
 
-			TKeyEntryInfo& i = got->second;
+			const TKeyEntryInfo& i = got->second;
 			const TKeyEntry& e = i();
 
 			filePtr->seekg(e.dataPos);
@@ -480,7 +480,7 @@ namespace kvdb {
 			return nullptr;
 		}
 
-		std::shared_ptr<V> load(const K& k) {
+		std::shared_ptr<V> load(const K& k) const {
 			return valueFromData(loadData(k));
 		}
 
