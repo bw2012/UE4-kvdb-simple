@@ -239,7 +239,7 @@ void test4(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
 // test null values
 //=====================================================================================
 
-void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTestDataItem> &test_set, size_t &created_elements, int size) {
+bool createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTestDataItem> &test_set, size_t &created_elements, int size) {
     std::remove(file_name.c_str());
 
     printf("Create new empty file\n");
@@ -261,13 +261,20 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
 
                 int flag = n % 65536;
 
-                if(n % 200 == 0){
+                if (n % 200 == 0) {
                     double p = (double)n / (double)(size * size * size);
                     printf("\rFill test file: %.2f%%", p * 100);
                 }
 
-                test_set.insert({index, TTestDataItem{index, zero_data, (uint16)flag}});
+                test_set[index] = TTestDataItem{index, zero_data, (uint16)flag};
                 kv_file.save(index, zero_data, (uint16)flag);
+
+                const auto ff = kv_file.k_flags(index);
+
+                if (ff != flag) {
+                    return false;
+                }
+
                 n++;
             }
         }
@@ -279,11 +286,13 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
 
     created_elements = n;
     kv_file.close();
+
+    return true;
 }
 
 void make_test_data(TValueData &data, int size) {
 
-    data.reserve(size);
+    data.resize(size);
 
     for (int i = 0; i < size; i++) {
         auto v = rand() % 256;
@@ -294,25 +303,27 @@ void make_test_data(TValueData &data, int size) {
 bool check_values(const kvdb::KvFile<TVoxelIndex, TValueData> &kv_file, const std::unordered_map<TVoxelIndex, TTestDataItem> &test_data_map) {
 
     int i = 0;
-    bool ok = true;
+
     for (const auto &a : test_data_map) {
         const auto &ti = a.second;
 
         const auto ptr = kv_file.load(ti.key);
         const auto f = kv_file.k_flags(ti.key);
 
-        ok = (ptr != nullptr) && (f == ti.flags);
+        bool ok = f == ti.flags;
         if (!ok) {
             printf("fail: %d\n", i);
             printf("key: %d %d %d \n", ti.key.X, ti.key.Y, ti.key.Z);
             printf("flag: %d %d\n", f, ti.flags);
-            break;
+            return false;
         }
+
+        // TODO asset values
 
         i++;
     }
 
-    return ok;
+    return true;
 }
 
 void test_null_val1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map) {
@@ -362,8 +373,10 @@ void test_big1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map) {
 
     std::string file_name = TEST_FILE2;
 
+    const int s = 50;
+
     size_t n;
-    createTestFile(file_name, test_data_map, n, 50);
+    print_assert(createTestFile(file_name, test_data_map, n, s), "Create new file");
 
     kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
     bool is_exist = (kv_file.open(file_name) == KVDB_OK);
@@ -378,6 +391,56 @@ void test_big1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map) {
     // add new keys
     printf("Add new kev/value pairs with flag\n");
 
+    const int s2 = s + 2;
+
+    bool ok = true;
+
+    size_t n2 = 0;
+    for (int x = 0; x < s2; x += 2) {
+        for (int y = 0; y < s2; y += 2) {
+            for (int z = 0; z < s2; z += 2) {
+                TVoxelIndex index(x, y, z);
+
+                int flag = n2 % 65536;
+
+                if (n2 % 100 == 0) {
+                    double p = (double)n2 / (double)(s2 * s2 * s2);
+                    printf("\rRefill test file: %.2f%%", p * 100);
+                }
+
+                TValueData data;
+                make_test_data(data, 100);
+
+                test_data_map[index] = TTestDataItem{index, data, (uint16)flag};
+                kv_file.save(index, data, (uint16)flag);
+
+                const auto ff = kv_file.k_flags(index);
+
+                if (flag != ff) {
+                    ok = false;
+                    break;
+                }
+
+                n2++;
+            }
+
+            if (!ok) {
+                break;
+            }
+        }
+
+        if (!ok) {
+            break;
+        }
+    }
+
+    printf("\n");
+
+    print_assert(ok, "Change data");
+
+    printf("Refilled\n");
+
+    /*
     TVoxelIndex key1(10, 8, -9);
     TValueData data1;
     make_test_data(data1, 100);
@@ -391,6 +454,7 @@ void test_big1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map) {
 
     kv_file.save(key2, data2, 255);
     test_data_map.insert({key2, TTestDataItem{key2, data2, (uint16)255}});
+    */
 
     print_assert(check_values(kv_file, test_data_map), "Check values");
 
@@ -415,7 +479,6 @@ int main() {
 
     std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map3;
     test_big1(test_data_map3);
-
 
     printf("\n");
 }
