@@ -239,7 +239,7 @@ void test4(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
 // test null values
 //=====================================================================================
 
-void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTestDataItem> &test_set, int &created_elements, int size) {
+void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTestDataItem> &test_set, size_t &created_elements, int size) {
     std::remove(file_name.c_str());
 
     printf("Create new empty file\n");
@@ -253,13 +253,18 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
     TValueData zero_data;
     zero_data.resize(0);
 
-    int n = 0;
+    size_t n = 0;
     for (int x = 0; x < size; x++) {
         for (int y = 0; y < size; y++) {
             for (int z = 0; z < size; z++) {
                 TVoxelIndex index(x, y, z);
 
                 int flag = n % 65536;
+
+                if(n % 200 == 0){
+                    double p = (double)n / (double)(size * size * size);
+                    printf("\rFill test file: %.2f%%", p * 100);
+                }
 
                 test_set.insert({index, TTestDataItem{index, zero_data, (uint16)flag}});
                 kv_file.save(index, zero_data, (uint16)flag);
@@ -268,7 +273,9 @@ void createTestFile(std::string file_name, std::unordered_map<TVoxelIndex, TTest
         }
     }
 
-    print_assert((int)kv_file.size() == n, "File size");
+    printf("\nTest file filled\n");
+
+    print_assert(kv_file.size() == n, "File size");
 
     created_elements = n;
     kv_file.close();
@@ -312,7 +319,7 @@ void test_null_val1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map
     print_test_name("Test#5", "Zero length values...");
 
     std::string file_name = TEST_FILE2;
-    int n;
+    size_t n;
 
     createTestFile(file_name, test_data_map, n, 3);
 
@@ -322,7 +329,7 @@ void test_null_val1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map
 
     printf("File size: %d \n", (int)kv_file.size());
 
-    print_assert((int)kv_file.size() == n, "File size");
+    print_assert(kv_file.size() == n, "File size");
     print_assert(kv_file.reserved() == (size_t)(KVDB_RESERVED_TABLE_SIZE - n), "Reserved");
 
     print_assert(check_values(kv_file, test_data_map), "Check values");
@@ -350,6 +357,46 @@ void test_null_val1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map
     printf("=========================== \n\n");
 }
 
+void test_big1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map) {
+    print_test_name("Test#6", "Big data test...");
+
+    std::string file_name = TEST_FILE2;
+
+    size_t n;
+    createTestFile(file_name, test_data_map, n, 50);
+
+    kvdb::KvFile<TVoxelIndex, TValueData> kv_file;
+    bool is_exist = (kv_file.open(file_name) == KVDB_OK);
+    print_assert(is_exist, "Open file");
+
+    printf("File size: %d \n", (int)kv_file.size());
+
+    print_assert(kv_file.size() == n, "File size");
+
+    print_assert(check_values(kv_file, test_data_map), "Check values");
+
+    // add new keys
+    printf("Add new kev/value pairs with flag\n");
+
+    TVoxelIndex key1(10, 8, -9);
+    TValueData data1;
+    make_test_data(data1, 100);
+
+    kv_file.save(key1, data1, 10);
+    test_data_map.insert({key1, TTestDataItem{key1, data1, (uint16)10}});
+
+    TVoxelIndex key2(0, -4, 11);
+    TValueData data2;
+    make_test_data(data1, 300);
+
+    kv_file.save(key2, data2, 255);
+    test_data_map.insert({key2, TTestDataItem{key2, data2, (uint16)255}});
+
+    print_assert(check_values(kv_file, test_data_map), "Check values");
+
+    printf("=========================== \n\n");
+}
+
 //=====================================================================================
 
 int main() {
@@ -363,9 +410,12 @@ int main() {
     test4(test_data_map);
 
     // keys with zero length values
-
     std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map2;
     test_null_val1(test_data_map2);
+
+    std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map3;
+    test_big1(test_data_map3);
+
 
     printf("\n");
 }
