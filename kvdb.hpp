@@ -38,7 +38,6 @@ typedef uint16_t uint16;
 typedef unsigned long long ulong64;
 typedef unsigned char byte;
 
-//typedef std::array<byte, KVDB_KEY_SIZE> TKeyData;
 typedef std::vector<byte> TKeyData;
 typedef std::vector<byte> TValueData;
 typedef std::shared_ptr<TValueData> TValueDataPtr;
@@ -151,12 +150,6 @@ namespace kvdb {
 	typedef struct TKeyEntry {
 		TKeyEntryHeader header;
 		TKeyData freeKeyData;
-
-		void empty(uint32 size){
-			freeKeyData.resize(size);
-			std::fill(freeKeyData.begin(), freeKeyData.end(), 0);
-		}
-
 	} TKeyEntry;
 
 	typedef TPosWrapper<TKeyEntry> TKeyEntryInfo;
@@ -290,6 +283,17 @@ namespace kvdb {
 			is->read((char*)ke.freeKeyData.data(), sizeof(K));
 		}
 
+		static void writeKey(std::ostream* os, TKeyEntry& ke) {
+			if(ke.freeKeyData.size() == 0){
+				TKeyData kd;
+				kd.resize(sizeof(K));
+				std::fill(kd.begin(), kd.end(), 0);
+				ke.freeKeyData = kd;
+			}
+
+			os << ke;
+		}
+
 		ulong64 readTable() {
 			ulong64 tablePos = (ulong64)filePtr->tellg();
 
@@ -333,8 +337,7 @@ namespace kvdb {
 			for (uint32 i = 0; i < reservedKeys; i++) {
 				uint32 newReservedKeyPos = (uint32)filePtr->tellp();
 				TKeyEntry newReservedKey;
-				newReservedKey.empty(keySize);
-				filePtr << newReservedKey;
+				writeKey(filePtr, newReservedKey);
 				TKeyEntryInfo keyInfo(newReservedKey, newReservedKeyPos);
 				reservedKeyList.push_back(keyInfo);
 			}
@@ -404,12 +407,10 @@ namespace kvdb {
 	public:
 
 		KvFile() {
-			//assert(sizeof(K) <= KVDB_KEY_SIZE);
 			keySize = sizeof(K);
 		}
 
 		explicit KvFile(uint32 s) : expandDataTo(s) {
-			//assert(sizeof(K) <= KVDB_KEY_SIZE);
 			keySize = sizeof(K);
 		}
 
@@ -587,9 +588,8 @@ namespace kvdb {
 				// add empty records
 				const ulong64 emptyRecords = max_key_records - test.size();
 				for (ulong64 i = 0; i < emptyRecords; i++) {
-					TKeyEntry entry;
-					entry.empty(sizeof(K));
-					outFilePtr << entry;
+					TKeyEntry key;
+					writeKey(outFilePtr, key);
 				}
 			}
 
