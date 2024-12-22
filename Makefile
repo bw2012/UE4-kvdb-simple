@@ -12,7 +12,7 @@ test_kvdb: test/test.cpp kvdb.hpp
 	$(CC) $(CFLAGS) -o test_kvdb test/test.cpp $(CLIBS) 
 
 clean_data:
-	rm -f *.dat
+	rm -f *.dat1
 	
 clean: clean_data
 	rm -f test_kvdb

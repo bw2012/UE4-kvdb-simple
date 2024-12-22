@@ -22,7 +22,7 @@
 #include <functional>
 #include <cmath>
 
-#define KVDB_KEY_SIZE 12 // 3 x int32 (X, Y, Z)
+
 #define KVDB_RESERVED_TABLE_SIZE 1000
 #define KVDB_MIN_DATA_SIZE 256
 
@@ -38,7 +38,8 @@ typedef uint16_t uint16;
 typedef unsigned long long ulong64;
 typedef unsigned char byte;
 
-typedef std::array<byte, KVDB_KEY_SIZE> TKeyData;
+//typedef std::array<byte, KVDB_KEY_SIZE> TKeyData;
+typedef std::vector<byte> TKeyData;
 typedef std::vector<byte> TValueData;
 typedef std::shared_ptr<TValueData> TValueDataPtr;
 
@@ -67,7 +68,7 @@ namespace kvdb {
 	void write(std::ostream* os, const T& obj) {
 		if (os != nullptr) {
 			os->write((char*)&obj, sizeof(obj));
-		}
+		} 
 	}
 
 	template <typename T>
@@ -100,6 +101,7 @@ namespace kvdb {
 	// File header
 	//============================================================================
 	typedef struct TFileHeader {
+		char h[4] = {'K', 'V', 'D', 'B'};
 		uint32 version = KVDB_FILE_VERSION;
 		uint32 keySize = 0;
 		ulong64 timestamp = 0;
@@ -139,24 +141,35 @@ namespace kvdb {
 	//============================================================================
 	// Key Entry
 	//============================================================================
-	typedef struct TKeyEntry {
+	typedef struct TKeyEntryHeader {
 		ulong64 dataPos = 0;
 		ulong64 dataLength = 0;
 		ulong64 initialDataLength = 0;
-		TKeyData freeKeyData;
 		uint16 flags = 0;
+	} TKeyEntryHeader;
+
+	typedef struct TKeyEntry {
+		TKeyEntryHeader header;
+		TKeyData freeKeyData;
+
+		void empty(uint32 size){
+			freeKeyData.resize(size);
+			std::fill(freeKeyData.begin(), freeKeyData.end(), 0);
+		}
+
 	} TKeyEntry;
 
 	typedef TPosWrapper<TKeyEntry> TKeyEntryInfo;
 
 	struct TKeyInfoComparatorByInitialLength {
 		bool operator() (const TKeyEntryInfo& lhs, const TKeyEntryInfo& rhs) const {
-			return (lhs().initialDataLength > rhs().initialDataLength);
+			return (lhs().header.initialDataLength > rhs().header.initialDataLength);
 		}
 	};
 
 	inline std::ostream* operator << (std::ostream* os, const TKeyEntry& obj) {
-		write(os, obj);
+		write(os, obj.header);
+		os->write((char*)obj.freeKeyData.data(), obj.freeKeyData.size());
 		return os;
 	}
 
@@ -164,11 +177,6 @@ namespace kvdb {
 		os->seekp(objInfo.pos);
 		os << objInfo();
 		return os;
-	}
-
-	inline std::istream* operator >> (std::istream* is, TKeyEntry& obj) {
-		read(is, obj);
-		return is;
 	}
 
 	//============================================================================
@@ -187,7 +195,8 @@ namespace kvdb {
 		mutable std::mutex fileSharedMutex;
 
 		const uint32 reservedKeys = KVDB_RESERVED_TABLE_SIZE;
-		const volatile uint32 reservedValueSize = 0; // kek
+		const volatile uint32 expandDataTo = 0; // kek
+		uint32 keySize = 0;
 
 	private:
 
@@ -204,14 +213,15 @@ namespace kvdb {
 		}
 
 		static TKeyData toKeyData(K key) {
-			TKeyData kd;
-			std::memcpy(&kd[0], &key, sizeof(K));
+			TKeyData kd(sizeof(K));
+			std::fill(kd.begin(), kd.end(), 0);
+			std::memcpy(kd.data(), &key, sizeof(K));
 			return kd;
 		}
 
 		static K keyFromKeyData(const TKeyData& kd) {
 			K key;
-			std::memcpy(&key, &kd, sizeof(K));
+			std::memcpy(&key, kd.data(), sizeof(K));
 			return key;
 		}
 
@@ -222,18 +232,18 @@ namespace kvdb {
 
 		void rewritePair(TKeyEntryInfo& keyInfo, const TValueData& valueData, const uint16 k_flags) {
 			// rewrite value data
-			filePtr->seekp(keyInfo().dataPos);
+			filePtr->seekp(keyInfo().header.dataPos);
 			filePtr->write((char*)valueData.data(), valueData.size());
 			// rewrite key data
-			keyInfo().dataLength = valueData.size(); // new length
-			keyInfo().flags = k_flags;
+			keyInfo().header.dataLength = valueData.size(); // new length
+			keyInfo().header.flags = k_flags;
 			filePtr << keyInfo;
 		}
 
 		void earsePair(TKeyEntryInfo& keyInfo) {
 			// rewrite key data
-			keyInfo().dataLength = 0; // new length
-			keyInfo().flags = 0;
+			keyInfo().header.dataLength = 0; // new length
+			keyInfo().header.flags = 0;
 			filePtr << keyInfo;
 			deletedKeyList.insert(keyInfo);
 			dataMap.erase(keyInfo().freeKeyData);
@@ -250,9 +260,9 @@ namespace kvdb {
 			TKeyEntryInfo& keyInfo = reservedKeyList.front();
 			TValueData valueDataExp;
 
-			if (reservedValueSize > 0) {
-				uint32 n = (uint32)std::round((float)valueData.size() / (float)reservedValueSize) + 1;
-				expandValueData(valueData, valueDataExp, (ulong64)n * (ulong64)reservedValueSize);
+			if (expandDataTo > 0) {
+				uint32 n = (uint32)std::round((float)valueData.size() / (float)expandDataTo) + 1;
+				expandValueData(valueData, valueDataExp, (ulong64)n * (ulong64)expandDataTo);
 			} else {
 				valueDataExp = std::move(valueData);
 			}
@@ -262,16 +272,22 @@ namespace kvdb {
 			filePtr->write((char*)valueDataExp.data(), valueDataExp.size());
 
 			// fill key data
-			keyInfo().dataLength = valueData.size(); // length
-			keyInfo().initialDataLength = valueDataExp.size(); // length
-			keyInfo().dataPos = (valueData.size() > 0) ? endFile : 1; // allow zero length value
+			keyInfo().header.dataLength = valueData.size(); // length
+			keyInfo().header.initialDataLength = valueDataExp.size(); // length
+			keyInfo().header.dataPos = (valueData.size() > 0) ? endFile : 1; // allow zero length value
 			keyInfo().freeKeyData = keyData;
-			keyInfo().flags = k_flags;
+			keyInfo().header.flags = k_flags;
 			filePtr << keyInfo;
 
 			// add new pair to table 
 			dataMap.insert({ keyInfo().freeKeyData, keyInfo });
 			reservedKeyList.pop_front();
+		}
+
+		void readKey(std::istream* is, TKeyEntry& ke) {
+			read(is, ke.header);
+			ke.freeKeyData.resize(sizeof(K));
+			is->read((char*)ke.freeKeyData.data(), sizeof(K));
 		}
 
 		ulong64 readTable() {
@@ -283,14 +299,14 @@ namespace kvdb {
 			for (unsigned int i = 0; i < tableHeader.recordCount; i++) {
 				ulong64 pos = (ulong64)filePtr->tellg();
 				TKeyEntry keyEntry;
-				filePtr >> keyEntry;
-				TKeyEntryInfo keyInfo(keyEntry, pos);
+				readKey(filePtr, keyEntry);
 
-				if (keyInfo().dataLength > 0) { 
+				TKeyEntryInfo keyInfo(keyEntry, pos);
+				if (keyInfo().header.dataLength > 0) { 
 					dataMap.insert({ keyEntry.freeKeyData, keyInfo });
 				} else {
-					if (keyInfo().initialDataLength == 0) { 
-						if(keyInfo().dataPos == 1){ 
+					if (keyInfo().header.initialDataLength == 0) { 
+						if(keyInfo().header.dataPos == 1){ 
 							dataMap.insert({ keyEntry.freeKeyData, keyInfo }); // key with zero length data
 						} else {
 							reservedKeyList.push_back(keyInfo); // reserved key slot
@@ -317,6 +333,7 @@ namespace kvdb {
 			for (uint32 i = 0; i < reservedKeys; i++) {
 				uint32 newReservedKeyPos = (uint32)filePtr->tellp();
 				TKeyEntry newReservedKey;
+				newReservedKey.empty(keySize);
 				filePtr << newReservedKey;
 				TKeyEntryInfo keyInfo(newReservedKey, newReservedKeyPos);
 				reservedKeyList.push_back(keyInfo);
@@ -343,9 +360,9 @@ namespace kvdb {
 		bool tryWriteToSuitableDeletedPair(const TKeyData& keyData, const TValueData& valueData, const uint16 k_flags) {
 			for (auto itr = deletedKeyList.begin(); itr != deletedKeyList.end();) {
 				TKeyEntryInfo keyInfo = *itr;
-				if (keyInfo().initialDataLength >= valueData.size()) {
+				if (keyInfo().header.initialDataLength >= valueData.size()) {
 					keyInfo().freeKeyData = keyData;
-					keyInfo().flags = k_flags;
+					keyInfo().header.flags = k_flags;
 					rewritePair(keyInfo, valueData, k_flags);
 					dataMap.insert({ keyInfo().freeKeyData, keyInfo });
 					itr = deletedKeyList.erase(itr);
@@ -371,7 +388,7 @@ namespace kvdb {
 		void change(const TKeyData& keyData, const TValueData& valueData, const uint16 k_flags) {
 			TKeyEntryInfo& keyInfo = dataMap[keyData];
 			if (valueData.size() > 0) {
-				if (keyInfo().initialDataLength >= valueData.size()) {
+				if (keyInfo().header.initialDataLength >= valueData.size()) {
 					rewritePair(keyInfo, valueData, k_flags);
 				} else {
 					//remove old and create new
@@ -387,11 +404,13 @@ namespace kvdb {
 	public:
 
 		KvFile() {
-			assert(sizeof(K) <= KVDB_KEY_SIZE);
+			//assert(sizeof(K) <= KVDB_KEY_SIZE);
+			keySize = sizeof(K);
 		}
 
-		explicit KvFile(uint32 s) : reservedValueSize(s) {
-			assert(sizeof(K) <= KVDB_KEY_SIZE);
+		explicit KvFile(uint32 s) : expandDataTo(s) {
+			//assert(sizeof(K) <= KVDB_KEY_SIZE);
+			keySize = sizeof(K);
 		}
 
 		~KvFile() {
@@ -462,7 +481,7 @@ namespace kvdb {
 
 			if (auto a = dataMap.find(keyData); a != dataMap.end()) {
 				const auto ki = a->second;
-				return ki().flags;
+				return ki().header.flags;
 			}
 			
 			return 0;
@@ -480,12 +499,12 @@ namespace kvdb {
 			const TKeyEntryInfo& i = got->second;
 			const TKeyEntry& e = i();
 
-			filePtr->seekg(e.dataPos);
+			filePtr->seekg(e.header.dataPos);
 
 			TValueDataPtr dataPtr = TValueDataPtr(new TValueData);
-			dataPtr->resize(e.dataLength);
+			dataPtr->resize(e.header.dataLength);
 
-			if (filePtr->read((char*)dataPtr->data(), e.dataLength)) {
+			if (filePtr->read((char*)dataPtr->data(), e.header.dataLength)) {
 				return dataPtr;
 			}
 
@@ -541,16 +560,16 @@ namespace kvdb {
 			const ulong64 keyRecords = (test.size() > max_key_records) ? test.size() : max_key_records;
 
 			// save file header
-			TFileHeader fileHeader{ .keySize = KVDB_KEY_SIZE, .endOfHeaderOffset = sizeof(fileHeader) };
+			TFileHeader fileHeader{ .keySize = sizeof(K), .endOfHeaderOffset = sizeof(fileHeader) };
 			outFilePtr << fileHeader;
 
 			TTableHeader tableHeader{keyRecords, 0};
 			outFilePtr << tableHeader;
 
-			ulong64 bodyDataOffset = (ulong64)(outFile.tellp()) + sizeof(TKeyEntry) * keyRecords;
+			ulong64 bodyDataOffset = (ulong64)(outFile.tellp()) + (sizeof(TKeyEntryHeader) + sizeof(K)) * keyRecords;
 			std::vector<byte> dataBody;
 			for (auto& e : test) {
-				TKeyEntry entry{ .dataPos = dataBody.size() + bodyDataOffset, .freeKeyData = toKeyData(e.first) };
+				TKeyEntry entry{ .header = TKeyEntryHeader{ .dataPos = dataBody.size() + bodyDataOffset }, .freeKeyData = toKeyData(e.first) };
 				TValueData valueData;
 				if constexpr (std::is_same<V, TValueData>::value) {
 					valueData = static_cast<TValueData>(e.second);
@@ -558,8 +577,8 @@ namespace kvdb {
 					toValueData(e.second, valueData);
 				}
 
-				entry.dataLength = valueData.size();
-				entry.initialDataLength = valueData.size();
+				entry.header.dataLength = valueData.size();
+				entry.header.initialDataLength = valueData.size();
 				dataBody.insert(std::end(dataBody), std::begin(valueData), std::end(valueData));
 				outFilePtr << entry;
 			}
@@ -569,6 +588,7 @@ namespace kvdb {
 				const ulong64 emptyRecords = max_key_records - test.size();
 				for (ulong64 i = 0; i < emptyRecords; i++) {
 					TKeyEntry entry;
+					entry.empty(sizeof(K));
 					outFilePtr << entry;
 				}
 			}

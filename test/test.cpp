@@ -69,6 +69,7 @@ void test1(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
     const std::unordered_map<TVoxelIndex, TTT> empty;
     kvdb::KvFile<TVoxelIndex, TTT>::create(file_name, empty);
 
+    printf("Open file...\n");
     kvdb::KvFile<TVoxelIndex, TTT> kv_file1;
     bool is_exist = (kv_file1.open(file_name) == KVDB_OK);
     print_assert(is_exist, "Open file");
@@ -178,6 +179,29 @@ void test3(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
                 test_data_map[index] = TTestStructItem{index, test, f};
 
                 kv_file.save(index, test, f);
+
+                auto ptr = kv_file.load(index);
+                auto ff = kv_file.k_flags(index);
+
+/*
+                if(ff != f){
+                    printf("ERROR %d\n", i);
+                    exit(-1);
+                }
+
+                if(ptr == nullptr){
+                    printf("ERROR %d\n", i);
+                    exit(-1);
+                } else {
+                    TTT c = *ptr;
+                    if(!(c == test)){
+                        printf("ERROR %d\n", i);
+                        exit(-1);
+                    } else {
+                        printf("key: %f %f %f \n", c.T1, c.T2, c.T3);
+                    }
+                }
+*/
                 i++;
             }
         }
@@ -205,11 +229,20 @@ void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, T
         const auto &ti = test_pair.second;
 
         const auto &key = ti.key;
+
         const auto &value = ti.value;
         const auto flags = ti.flags;
-
         auto ptr = kv_file.load(key);
         auto f = kv_file.k_flags(key);
+
+        if(ptr == nullptr){
+            printf("fail: %d\n", i);
+            printf("key: %d %d %d \n", key.X, key.Y, key.Z);
+            printf("flag: %d %d\n", f, flags);
+            ok = false;
+            break;
+        }
+
         TTT c = *ptr;
 
         ok = (ptr != nullptr) && (f == flags) && (c == value);
@@ -228,6 +261,9 @@ void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, T
 
 void test4(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
     print_test_name("Test#4", "Open and check...");
+
+    //TVoxelIndex iii(9, 9, 9);
+   // test_data_map.insert({iii, TTestStructItem{iii, TTT(), 0}});
 
     std::string file_name = TEST_FILE1;
     checkWithMap(file_name, test_data_map);
