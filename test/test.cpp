@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <bit>
 
 #include "../kvdb.hpp"
 #include "VoxelIndex.h"
@@ -183,25 +184,25 @@ void test3(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
                 auto ptr = kv_file.load(index);
                 auto ff = kv_file.k_flags(index);
 
-/*
-                if(ff != f){
-                    printf("ERROR %d\n", i);
-                    exit(-1);
-                }
+                /*
+                                if(ff != f){
+                                    printf("ERROR %d\n", i);
+                                    exit(-1);
+                                }
 
-                if(ptr == nullptr){
-                    printf("ERROR %d\n", i);
-                    exit(-1);
-                } else {
-                    TTT c = *ptr;
-                    if(!(c == test)){
-                        printf("ERROR %d\n", i);
-                        exit(-1);
-                    } else {
-                        printf("key: %f %f %f \n", c.T1, c.T2, c.T3);
-                    }
-                }
-*/
+                                if(ptr == nullptr){
+                                    printf("ERROR %d\n", i);
+                                    exit(-1);
+                                } else {
+                                    TTT c = *ptr;
+                                    if(!(c == test)){
+                                        printf("ERROR %d\n", i);
+                                        exit(-1);
+                                    } else {
+                                        printf("key: %f %f %f \n", c.T1, c.T2, c.T3);
+                                    }
+                                }
+                */
                 i++;
             }
         }
@@ -235,7 +236,7 @@ void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, T
         auto ptr = kv_file.load(key);
         auto f = kv_file.k_flags(key);
 
-        if(ptr == nullptr){
+        if (ptr == nullptr) {
             printf("fail: %d\n", i);
             printf("key: %d %d %d \n", key.X, key.Y, key.Z);
             printf("flag: %d %d\n", f, flags);
@@ -262,8 +263,8 @@ void checkWithMap(std::string file_name, const std::unordered_map<TVoxelIndex, T
 void test4(std::unordered_map<TVoxelIndex, TTestStructItem> &test_data_map) {
     print_test_name("Test#4", "Open and check...");
 
-    //TVoxelIndex iii(9, 9, 9);
-   // test_data_map.insert({iii, TTestStructItem{iii, TTT(), 0}});
+    // TVoxelIndex iii(9, 9, 9);
+    // test_data_map.insert({iii, TTestStructItem{iii, TTT(), 0}});
 
     std::string file_name = TEST_FILE1;
     checkWithMap(file_name, test_data_map);
@@ -500,6 +501,14 @@ void test_big1(std::unordered_map<TVoxelIndex, TTestDataItem> test_data_map) {
 //=====================================================================================
 
 int main() {
+
+    if constexpr (std::endian::native == std::endian::big)
+        std::cout << "big-endian\n";
+    else if constexpr (std::endian::native == std::endian::little)
+        std::cout << "little-endian\n";
+    else
+        std::cout << "mixed-endian\n";
+
     printf("\nRun KVDB tests... \n\n");
 
     // basic functionality
