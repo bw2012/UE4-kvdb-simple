@@ -1,6 +1,6 @@
 
 CC = g++
-CFLAGS = -std=c++20 -Wall
+CFLAGS = -std=c++20 -Wall -Wfatal-errors
 CLIBS = -lstdc++ 
 
 all: clean_data tests 
